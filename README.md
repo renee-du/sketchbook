@@ -33,3 +33,12 @@ python3 tools/glow_tex.py work/right_clean.png assets/glow.webp   # lamplight, f
 `tools/pages_config.py` lists every item on every page and what it does when tapped
 (bite, scoop, sip, fold, swing, hop, walk, sway in the breeze, glow, toss, slice...).
 The engine is `SketchPage` in `app.js`.
+
+### This round
+
+- `src/` holds the engine pieces that are concatenated into `app.js`: `engine.js` (pencil colouring,
+  hatching, sounds), `cat.js` (the redrawn Seillans cat: a skeleton with IK legs, a walk cycle,
+  breathing, blinks, ear flicks, sitting and a sprung tail), `page.js` (pages: dragging, colouring
+  sweeps, pieces, cheese pulls), `curl.js` (the WebGL page turn).
+- Colouring in uses the artist's own yellow hatching from the sunset page as the stroke texture,
+  revealed band by band in the order a hand lays strokes.
