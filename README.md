@@ -7,8 +7,7 @@ Open `index.html` through any static server (`python3 -m http.server`).
   through orange, rose and violet using the drawing's own pencil strokes. Tap or drag on
   the sea for ripples, drag the sky up and down to move the sun, tap the sky to send gulls off.
   The sky is coloured in edge to edge with patches of the artist's own hatching (`tools/fill_sky.py`).
-- **Treats page**: tap the watermelon, cherry, popsicle and éclair; tap a handwritten word
-  to hear the Italian. The popsicle is eaten one bite per tap; tap the stick for another.
+- **Treats page**: tap the watermelon, cherry, popsicle and éclair. The popsicle is eaten one bite per tap; tap the stick for another.
 
 ## Rebuilding the assets from the photo
 

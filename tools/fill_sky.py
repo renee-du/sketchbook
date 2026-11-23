@@ -44,8 +44,11 @@ def fill_sky(R, land, seed=3):
     Dy = 0.40 + 0.60 * Dy0
     y = np.arange(H, dtype=np.float32)[:, None]
     ss = lambda a, b, v: np.clip((v - a) / (b - a), 0, 1) ** 2 * (3 - 2 * np.clip((v - a) / (b - a), 0, 1))
-    blue_amt = (0.25 - 0.06 * ss(120, 400, y)) * (1 - ss(370, 520, y))
-    yel_amt = 0.42 * ss(400, 560, y) * (1 - 0.8 * ss(590, 680, y))
+    # the glow is a dome around the sun: the blue/yellow boundary arcs down toward the page edges
+    xs = np.arange(W, dtype=np.float32)[None]
+    yc = y - 0.00062 * (xs - 455) ** 2
+    blue_amt = (0.25 - 0.06 * ss(120, 400, yc)) * (1 - ss(370, 520, yc))
+    yel_amt = 0.42 * np.maximum(ss(400, 560, yc), ss(500, 620, y)) * (1 - 0.7 * ss(600, 690, y))
     sky = (1 - land) * ss(2, 14, y) * np.ones((1, W), np.float32)
     x = np.arange(W, dtype=np.float32)[None]
     sky *= ss(0, 8, x) * (1 - ss(884, 896, x))

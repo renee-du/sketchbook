@@ -139,7 +139,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .page.right canvas.sky { cursor: ns-resize; }
 .page.right canvas.sea { cursor: pointer; }
 
-/* speech pill for the Italian words */
+/* small note pill (popsicle finished) */
 .say {
   position: absolute; z-index: 5; pointer-events: none;
   transform: translate(-50%, -100%) translateY(-6px);
@@ -234,8 +234,8 @@ footer { display: grid; gap: 10px; justify-items: center; max-width: 560px; widt
     <ul class="hints" id="hints">
       <li><strong>Tap</strong> the sea</li>
       <li><strong>Drag</strong> the sky to move the sun</li>
-      <li><strong>Tap</strong> the treats (the popsicle is for eating)</li>
-      <li><strong>Tap</strong> a word to hear the Italian</li>
+      <li><strong>Tap</strong> the treats</li>
+      <li>The popsicle is for eating</li>
     </ul>
   </footer>
 </div>
@@ -634,13 +634,6 @@ function penStroke(x, pts, seed, scale, alpha) {
 }
 
 /* ======================================================= treats page (2D) */
-const ITALIAN = {
-  lbl_melon:   { it: 'anguria', say: 'anguria', hint: 'an·gu·RÌ·a' },
-  lbl_bracket: { it: 'anguria', say: 'anguria', hint: 'an·gu·RÌ·a' },
-  lbl_cherry:  { it: 'ciliegia', say: 'ciliegia', hint: 'ci·LIÈ·gia' },
-  lbl_pop:     { it: 'ghiacciolo al pistacchio', say: 'ghiacciolo al pistacchio', hint: 'ghiac·CIÒ·lo' },
-  lbl_eclair:  { it: 'éclair ai fichi e miele', say: 'éclair ai fichi e miele', hint: 'FI·chi e MIÈ·le' },
-};
 class Treats {
   constructor(canvas, imgs, meta) {
     this.c = canvas; this.x = canvas.getContext('2d'); this.base = imgs.left_base;
@@ -697,7 +690,7 @@ class Treats {
       it.sq = -.12; it.vsq = -1.5; it.vr += (px < it.pv[0] ? -.4 : .4);
       Sound.squish();
     } else if (it.label) {
-      it.vr += .9; this.say(n, px, py);
+      it.vr += .9;
     }
   }
   drip() {
@@ -712,7 +705,7 @@ class Treats {
     const c = document.createElement('canvas'); c.width = it.w; c.height = it.h;
     this.popOrig = it.img; it.img = c; this.popCtx = c.getContext('2d', { willReadFrequently: true });
     // the stick (page px) is never eaten
-    this.stick = [[676, 512], [700, 504], [760, 518], [784, 546], [772, 563], [722, 560], [678, 549]];
+    this.stick = [[659, 521], [688, 511], [705, 517], [746, 528], [773, 542], [786, 554], [780, 571], [758, 574], [724, 568], [699, 560], [680, 552], [658, 544]];
     this.biteSeq = [[466, 468, 60], [500, 545, 58], [536, 438, 62], [570, 532, 62], [606, 446, 64], [636, 548, 60], [662, 462, 62]];
     this.resetPopsicle();
   }
@@ -723,9 +716,10 @@ class Treats {
   }
   stickPath(x, grow = 0) {
     const it = this.pop; x.beginPath();
-    this.stick.forEach(([px, py], i) => { const X = px - it.x + (px > 730 ? grow : 0), Y = py - it.y; i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+    this.stick.forEach(([px, py], i) => { const X = px - it.x, Y = py - it.y; i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
     x.closePath();
   }
+  keepStick(x) { this.stickPath(x); x.fillStyle = '#000'; x.fill(); x.lineWidth = 6; x.lineJoin = 'round'; x.strokeStyle = '#000'; x.stroke(); }
   biteShape(x, cx, cy, r, grow) {
     // a jaw: one round bite with a row of teeth marks scalloping its rim
     x.beginPath(); x.arc(cx, cy, r - 5 + grow, 0, Math.PI * 2); x.fill();
@@ -759,12 +753,12 @@ class Treats {
       rg.fillStyle = `rgb(${PEN})`; shape(rg, 2.8); rg.globalCompositeOperation = 'destination-out'; shape(rg, 0);
       t.drawImage(ring, 0, 0);
       t.globalCompositeOperation = 'destination-in'; t.drawImage(it.img, 0, 0);      // only where there is still popsicle
-      t.globalCompositeOperation = 'destination-out'; this.stickPath(t); t.fill();
+      t.globalCompositeOperation = 'destination-out'; this.keepStick(t);
       t.globalCompositeOperation = 'source-over';
     }
     // crumbs: real pixels from the bitten part
     const mask = document.createElement('canvas'); mask.width = W; mask.height = H; const mk = mask.getContext('2d');
-    shape(mk, 0); mk.globalCompositeOperation = 'destination-out'; this.stickPath(mk); mk.fill();
+    shape(mk, 0); mk.globalCompositeOperation = 'destination-out'; this.keepStick(mk);
     const md = mk.getImageData(0, 0, W, H).data, bd = before.data;
     let tries = 0, made = 0;
     while (made < 14 && tries++ < 600) {
@@ -791,24 +785,6 @@ class Treats {
     const pill = document.createElement('div'); pill.className = 'say';
     pill.innerHTML = '<b></b><span></span>'; pill.querySelector('b').textContent = main; pill.querySelector('span').textContent = sub;
     pill.style.left = clamp((it.x + it.w * .7) / PW * 100, 18, 82) + '%'; pill.style.top = ((it.y + 110) / PH * 100) + '%';
-    host.appendChild(pill); setTimeout(() => pill.remove(), 2700);
-  }
-  say(name, px, py) {
-    const w = ITALIAN[name]; if (!w) return;
-    try {
-      if ('speechSynthesis' in window) {
-        speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(w.say); u.lang = 'it-IT'; u.rate = .82;
-        const v = speechSynthesis.getVoices().find((v) => /^it/i.test(v.lang)); if (v) u.voice = v;
-        speechSynthesis.speak(u);
-      }
-    } catch (e) {}
-    const host = this.c.parentElement; host.querySelectorAll('.say').forEach((n) => n.remove());
-    const it = this.by[name];
-    const pill = document.createElement('div'); pill.className = 'say';
-    pill.innerHTML = `<b></b><span></span>`; pill.querySelector('b').textContent = w.it; pill.querySelector('span').textContent = w.hint;
-    pill.style.left = clamp((it.x + it.w / 2) / PW * 100, 18, 82) + '%';
-    pill.style.top = (it.y / PH * 100) + '%';
     host.appendChild(pill); setTimeout(() => pill.remove(), 2700);
   }
   bindInput() {
