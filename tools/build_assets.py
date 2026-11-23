@@ -110,11 +110,11 @@ for name, (x0, y0, x1, y1) in items.items():
     m = np.zeros((H, W), np.uint8)
     m[y0:y1, x0:x1] = ink_mask[y0:y1, x0:x1]
     if name == 'cherry':     # leave the label leader line out of the cherry
-        m[y0:y1, 404:x1] = 0
+        m[y0:y1, 404:x1] = 0; m[284:y1, 393:x1] = 0
         m[388:, :300] = 0
     if name == 'lbl_cherry':
         m[y0:y1, x0:401] = ink_mask[y0:y1, x0:401] * 0
-        m[255:352, 405:440] = ink_mask[255:352, 405:440]
+        m[255:352, 405:440] = ink_mask[255:352, 405:440]; m[284:352, 393:405] = ink_mask[284:352, 393:405]
     k = 9 if name.startswith('lbl') else 15
     if name == 'melon': m[:405, :106] = 0; m[:388, 256:] = 0
     if name == 'popsicle': m[:412, 696:] = 0
