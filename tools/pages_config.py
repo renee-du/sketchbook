@@ -1,0 +1,147 @@
+"""Every new page: the things on it (boxes in 900x1300 page px), how to cut them out,
+and what they do when tapped. Order matters: earlier items claim their pixels first."""
+T = dict(b='text')
+def circ(cx, cy, r, n=28):
+    import math
+    return [(round(cx + r * math.cos(i / n * 6.283)), round(cy + r * math.sin(i / n * 6.283))) for i in range(n)]
+
+PAGES = {
+ # ------------------------------------------------------------- Seillans
+ 'fr_L': [
+  dict(id='t_title', box=(50, 20, 405, 90), **T),
+  dict(id='lantern', box=(250, 295, 388, 448), b='glow', glow=(292, 352, 190), pv=(300, 440)),
+  dict(id='flowers', box=(575, 728, 705, 802), b='pendulum', pv=(640, 800), k=40, idle=.03),
+  dict(id='tail', box=(752, 962, 822, 1056), b='tail', pv=(786, 1050), parent='cat', fill=(-300, 60)),
+  dict(id='cat', poly=[(512, 1030), (560, 1000), (604, 1012), (612, 1044), (700, 1048), (754, 1040), (790, 1060), (812, 1070),
+                       (828, 1110), (828, 1205), (800, 1210), (782, 1165), (700, 1165), (662, 1205), (612, 1214), (556, 1206),
+                       (540, 1188), (586, 1150), (586, 1098), (536, 1082), (514, 1062)], b='walk', pv=(675, 1208), range=(-430, 60), fill=(-300, 10)),
+  dict(id='sky', box=(0, 90, 900, 320), b='birds', zone=True),
+ ],
+ 'fr_R': [
+  dict(id='t_title', box=(55, 25, 440, 100), **T),
+  dict(id='spoon', box=(552, 96, 712, 478), b='tool', pv=(630, 410), tip=(632, 408), drips=dict(at=[(612, 470), (655, 462), (680, 440)], col=(176, 112, 70), every=3.2)),
+  dict(id='fork', box=(72, 712, 228, 1012), b='eat', r=30, protect=[(150, 830), (228, 820), (228, 1012), (72, 1012), (72, 930)], pv=(110, 1000)),
+  dict(id='dash1', box=(30, 380, 150, 610), b='pulse', c=(470, 560), keepSmall=True),
+  dict(id='dash2', box=(620, 520, 820, 630), b='pulse', c=(470, 560), keepSmall=True),
+  dict(id='split', box=(138, 200, 838, 928), b='scoop', r=44, tool='spoon', pv=(480, 900)),
+  dict(id='t_banana', box=(88, 930, 510, 1042), **T),
+  dict(id='t_quote', box=(262, 1045, 752, 1118), **T),
+ ],
+ # ------------------------------------------------------------- Spain
+ 'es_L': [
+  dict(id='t_agua', box=(612, 108, 822, 258), **T),
+  dict(id='t_aguacate', box=(338, 393, 552, 502), **T),
+  dict(id='t_pitahaya', box=(728, 548, 906, 668), **T),
+  dict(id='t_limon', box=(393, 593, 477, 652), **T),
+  dict(id='t_strac', box=(8, 593, 192, 708), **T),
+  dict(id='t_pist', box=(143, 913, 237, 1102), **T),
+  dict(id='cup1', box=(128, 58, 377, 507), b='sip', level=(272, 497), pv=(250, 500)),
+  dict(id='coconut', box=(370, 68, 557, 287), b='hop', pv=(460, 280), group='fruit'),
+  dict(id='avocado', box=(390, 233, 527, 407), b='hop', pv=(460, 400), group='fruit'),
+  dict(id='dragon', box=(596, 270, 807, 480), b='hop', pv=(700, 470), group='fruit'),
+  dict(id='banana', box=(623, 453, 902, 597), b='wobble', pv=(760, 590)),
+  dict(id='spoon2', box=(133, 538, 357, 657), b='wobble', pv=(150, 560), drips=dict(at=[(345, 652)], col=(226, 190, 92), every=2.6)),
+  dict(id='cup2', box=(498, 448, 732, 787), b='sip', level=(520, 777), pv=(615, 780)),
+  dict(id='limon', box=(278, 618, 457, 807), b='eat', r=34, pv=(365, 800)),
+  dict(id='strac', box=(58, 628, 287, 842), b='eat', r=38, pv=(170, 835)),
+  dict(id='sign', box=(363, 793, 547, 962), b='pendulum', pv=(508, 958), k=30, idle=.015),
+  dict(id='cone', box=(188, 763, 362, 1167), b='eat', r=36, pv=(275, 1160)),
+  dict(id='tray', box=(273, 843, 907, 1227), b='scoop', r=52, protect=[(273, 1172), (907, 1150), (907, 1227), (273, 1227)], pv=(590, 1220)),
+ ],
+ 'es_R': [
+  dict(id='t_tapas', box=(188, 128, 612, 258), **T),
+  dict(id='t_patatas', box=(438, 483, 802, 602), **T),
+  dict(id='t_gambas', box=(68, 613, 292, 697), **T),
+  dict(id='t_croq', box=(593, 648, 797, 707), **T),
+  dict(id='t_mont', box=(3, 813, 487, 887), **T),
+  dict(id='t_cheese', box=(223, 1153, 567, 1267), **T),
+  dict(id='t_tort1', box=(673, 1053, 827, 1107), **T),
+  dict(id='t_tort2', box=(593, 1218, 762, 1272), **T),
+  dict(id='fork1', box=(648, 172, 742, 334), b='tool', pv=(700, 320), tip=(690, 318)),
+  dict(id='patatas', box=(298, 273, 867, 567), b='pluck', r=34, mask='color', tool='fork1'),
+  dict(id='gambas', box=(103, 283, 272, 617), b='eat', r=30, pv=(185, 612)),
+  dict(id='mont', box=(58, 698, 567, 817), b='eat', r=36, pv=(310, 812)),
+  dict(id='fork2', box=(660, 852, 712, 1057), b='wobble', pv=(690, 1050)),
+  dict(id='croq', box=(548, 713, 792, 892), b='eat', r=40, pv=(680, 880)),
+  dict(id='board', box=(93, 853, 597, 1217), b='pluck', r=40, mask='color'),
+  dict(id='tortilla', box=(613, 1098, 847, 1262), b='eat', r=38, pv=(730, 1255)),
+ ],
+ # ------------------------------------------------------------- Rome sights
+ 'ro_L': [
+  dict(id='t_title', box=(25, 10, 318, 82), **T),
+  dict(id='t_coins', box=(48, 318, 302, 392), **T),
+  dict(id='coin1', poly=circ(136, 449, 86), b='toss', target=(600, 668), pv=(136, 449)),
+  dict(id='coin2', poly=circ(206, 508, 68), b='toss', target=(470, 676), pv=(206, 508)),
+  dict(id='water', box=(325, 598, 812, 708), b='water', mask='box'),
+  dict(id='trevi', box=(233, 8, 897, 708), b='splash'),
+  dict(id='t_trevi', box=(378, 728, 677, 797), **T),
+  dict(id='columns', box=(58, 683, 407, 1242), b='wobble', pv=(230, 1235), soft=True),
+  dict(id='lamp', box=(503, 803, 837, 1217), b='glow', glow=(548, 885, 210)),
+ ],
+ 'ro_R': [
+  dict(id='t_colos', box=(583, 63, 807, 117), **T),
+  dict(id='t_pizza', box=(273, 1138, 632, 1207), **T),
+  dict(id='tree', box=(682, 228, 762, 702), b='tree', pv=(712, 700)),
+  dict(id='crowd', box=(23, 606, 702, 802), b='crowd', mask='box'),
+  dict(id='colos', box=(38, 73, 702, 622), b='birds'),
+  dict(id='knife', poly=[(468, 1006), (560, 964), (690, 920), (708, 930), (697, 950), (586, 996), (486, 1027)], b='wobble', pv=(480, 1015)),
+  dict(id='pizza', box=(178, 843, 707, 1142), b='slices', c=(412, 1028), wedges=[[8, 102], [102, 155], [155, 208], [208, 262], [262, 315], [315, 368]], knife='knife'),
+ ],
+ # ------------------------------------------------------------- Tianzifang
+ 'sh_L': [
+  dict(id='t_title', box=(173, 43, 387, 107), **T),
+  dict(id='sign', box=(148, 298, 397, 472), b='pendulum', pv=(200, 300), k=24, idle=.012),
+  dict(id='rack', box=(543, 498, 702, 732), b='sway', pv=(620, 505), amp=4),
+  dict(id='people', box=(418, 438, 522, 622), b='crowd', mask='box'),
+  dict(id='tail', box=(208, 1080, 338, 1208), b='tail', pv=(330, 1102), parent='cat'),
+  dict(id='cat', box=(298, 928, 647, 1212), b='walk', pv=(470, 1205), range=(-260, 230), faces=1),
+ ],
+ 'sh_R': [
+  dict(id='butterfly', box=(0, 455, 217, 752), b='flutter', pv=(78, 600), axis=78),
+  dict(id='pendant', box=(248, 418, 337, 657), b='pendulum', pv=(292, 424), k=14, idle=.05),
+  dict(id='bracelet', box=(138, 153, 772, 442), b='wobble', pv=(450, 420)),
+  dict(id='oyster', box=(433, 458, 737, 687), b='clam', pearl=(562, 572), pv=(585, 680)),
+  dict(id='fan', box=(113, 763, 602, 1142), b='fan', pv=(470, 1122), a=(-166, -60)),
+  dict(id='lid', box=(583, 843, 847, 980), b='lid', pv=(715, 975)),
+  dict(id='tin', box=(583, 960, 847, 1140), b='wobble', pv=(715, 1135)),
+ ],
+ # ------------------------------------------------------------- furniture
+ 'fu_L': [
+  dict(id='lamp', box=(173, 0, 752, 222), b='glow', glow=(668, 64, 330), pv=(272, 205), swing=True),
+  dict(id='pillowL', box=(208, 183, 442, 362), b='hop', pv=(325, 355), group='pillows'),
+  dict(id='pillowR', box=(488, 153, 672, 317), b='hop', pv=(580, 310), group='pillows'),
+  dict(id='sofa', box=(123, 188, 752, 607), b='squish', pv=(440, 600), kick='pillows'),
+  dict(id='table', box=(758, 253, 900, 522), b='wobble', pv=(840, 500)),
+  dict(id='glass1', box=(348, 708, 422, 837), b='hop', pv=(385, 830), group='glasses'),
+  dict(id='glass2', box=(538, 743, 612, 857), b='hop', pv=(575, 850), group='glasses'),
+  dict(id='stool', box=(168, 703, 697, 1257), b='squish', pv=(430, 1240), kick='glasses'),
+ ],
+ 'fu_R': [
+  dict(id='chair', box=(178, 163, 777, 707), b='squish', pv=(470, 690)),
+  dict(id='plant', box=(28, 833, 152, 947), b='tree', pv=(95, 940)),
+  dict(id='table2', box=(0, 828, 227, 1077), b='wobble', pv=(110, 1060)),
+  dict(id='sofa2', box=(213, 733, 872, 1207), b='squish', pv=(540, 1190)),
+ ],
+ # ------------------------------------------------------------- clothes
+ 'cl_L': [
+  dict(id='t_clothes', box=(568, 148, 747, 277), **T),
+  dict(id='cap', box=(208, 13, 367, 107), b='flip', pv=(288, 95)),
+  dict(id='top', box=(148, 128, 472, 392), b='sway', pv=(300, 138), amp=5),
+  dict(id='shorts', box=(213, 368, 472, 592), b='sway', pv=(340, 375), amp=6),
+  dict(id='dress', box=(573, 453, 887, 947), b='sway', pv=(720, 470), amp=10),
+  dict(id='shoe', box=(3, 728, 467, 1062), b='hop', pv=(420, 1050), tip=True),
+ ],
+ 'cl_R': [
+  dict(id='clog', box=(433, 33, 762, 222), b='hop', pv=(600, 215)),
+  dict(id='tank', box=(123, 118, 352, 362), b='sway', pv=(240, 128), amp=5),
+  dict(id='skirt', box=(118, 343, 352, 588), b='sway', pv=(240, 350), amp=8),
+  dict(id='flatL', box=(138, 583, 257, 642), b='hop', pv=(195, 638), group='flats'),
+  dict(id='flatR', box=(253, 588, 367, 642), b='hop', pv=(310, 638), group='flats'),
+  dict(id='denim', box=(413, 323, 807, 912), b='sway', pv=(610, 335), amp=9),
+  dict(id='plaid', box=(173, 743, 367, 1107), b='sway', pv=(270, 752), amp=6),
+  dict(id='sneakL', poly=[(423, 993), (578, 993), (584, 1040), (520, 1072), (423, 1072)], b='hop', pv=(500, 1068), group='sneakers', step=True),
+  dict(id='sneakR', box=(513, 1028, 732, 1130), b='hop', pv=(620, 1125), group='sneakers', step=True),
+ ],
+}
+SPREADS = [('ro_L', 'ro_R'), ('fr_L', 'fr_R'), ('es_L', 'es_R'), ('sh_L', 'sh_R'), ('fu_L', 'fu_R'), ('cl_L', 'cl_R')]
+SOURCE = {'fr': 'france', 'es': 'spain', 'ro': 'rome', 'sh': 'shanghai', 'fu': 'furniture', 'cl': 'clothes'}

@@ -1,6 +1,8 @@
-# Taccuino di Roma
+# Taccuino di Viaggio
 
-An interactive version of a two-page colored-pencil spread from a Rome sketchbook.
+An interactive travel sketchbook: seven spreads (Rome, Seillans and Fayence, Spain, Tianzifang,
+furniture studies, clothes) built from photos of the real pages. Turn pages with the arrows, the
+arrow keys, or by dragging a page's outer edge. Every drawing is cut from the scan, never redrawn.
 Open `index.html` through any static server (`python3 -m http.server`).
 
 - **Sunset page**: the sun sets behind the mountains while the sky and sea regrade
@@ -19,3 +21,15 @@ python3 tools/clean.py work                  # remove the fingers + edges
 python3 tools/build_assets.py work assets    # fill the sky, cut layers, masks, sprites
 python3 tools/paper.py assets/paper.webp     # paper grain
 ```
+
+### The other six spreads
+
+```sh
+python3 tools/pages.py tools/spreads.json photos pages     # flatten + de-light + remove fingers
+python3 tools/build_pages.py pages assets                  # cut items listed in tools/pages_config.py
+python3 tools/glow_tex.py work/right_clean.png assets/glow.webp   # lamplight, from the artist's yellow hatching
+```
+
+`tools/pages_config.py` lists every item on every page and what it does when tapped
+(bite, scoop, sip, fold, swing, hop, walk, sway in the breeze, glow, toss, slice...).
+The engine is `SketchPage` in `app.js`.
