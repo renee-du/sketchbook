@@ -110,11 +110,11 @@ for name, (x0, y0, x1, y1) in items.items():
     m = np.zeros((H, W), np.uint8)
     m[y0:y1, x0:x1] = ink_mask[y0:y1, x0:x1]
     if name == 'cherry':     # leave the label leader line out of the cherry
-        m[y0:y1, 395:x1] = 0
+        m[y0:y1, 404:x1] = 0
         m[388:, :300] = 0
     if name == 'lbl_cherry':
         m[y0:y1, x0:401] = ink_mask[y0:y1, x0:401] * 0
-        m[255:352, 392:440] = ink_mask[255:352, 392:440]
+        m[255:352, 405:440] = ink_mask[255:352, 405:440]
     k = 9 if name.startswith('lbl') else 15
     if name == 'melon': m[:405, :106] = 0; m[:388, 256:] = 0
     if name == 'popsicle': m[:412, 696:] = 0
@@ -162,9 +162,13 @@ wash = 1 - (1 - np.clip(wash, 0, 1)) * 0.8 * conf
 # give the filled holes the scan's paper tooth, borrowed from blank paper lower down
 blank = L[930:1230]                     # an empty band of the page
 nb = np.vstack([blank] * (H // 300 + 1))[:H]
-tooth = nb - cv2.GaussianBlur(nb, (0, 0), 4)
+tooth = np.clip(nb - cv2.GaussianBlur(nb, (0, 0), 4), -0.025, 0.025)
 wash = np.clip(wash + tooth * 0.9, 0, 1)
-fill = L * keep[..., None] + wash * (1 - keep[..., None])
+# no ink may survive inside a lifted-out treat: take the paper's lightest tone nearby
+clean = cv2.GaussianBlur(cv2.dilate(L, np.ones((17, 17))), (0, 0), 6)
+hole = (1 - keep)[..., None]
+wash = np.minimum(np.maximum(wash, clean - 0.04), 1)
+fill = L * keep[..., None] + wash * hole
 save('left_base.webp', fill)
 
 meta['left'] = {}

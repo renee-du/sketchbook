@@ -425,6 +425,7 @@ class SketchPage {
       if (it.b === 'fan') it.fold += (it.foldTo - it.fold) * (1 - Math.exp(-dt * 7));
       if (it.b === 'glow') it.amt += ((it.on_ ? 1 : 0) - it.amt) * (1 - Math.exp(-dt * (it.on_ ? 5 : 3)));
       if (it.b === 'flutter') it.burst = Math.max(0, it.burst - dt * .6);
+      if (it.id === 'lid') { const u = clamp(-it.ty / 86, 0, 1); it.lift = u * .9; it.sc = 1 + u * .06; }   // nearer to you as it rises
       it.gustAmt = Math.max(0, it.gustAmt - dt * .55);
       if (it.state) this.updateToss(it, dt);
       if (it.anim) this.updateTool(it, dt);
@@ -542,7 +543,7 @@ class SketchPage {
   drawItem(x, it, k) {
     const LAYERED = { sway: 40, tree: 40, crowd: 12, water: 8, fan: 40, warp: 30 };
     const pad = LAYERED[it.b];
-    const mode = this.opaque ? 'source-over' : 'multiply';
+    const mode = this.opaque || it.opaque ? 'source-over' : 'multiply';
     if (it.lift > .02) {                    // picked up: a soft shadow on the page below
       if (!it.sil) { it.sil = canvasOf(it.w, it.h); const g = it.sil.getContext('2d'); g.drawImage(it.img, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgb(60,50,45)'; g.fillRect(0, 0, it.w, it.h); }
       this.T(x, k); x.globalCompositeOperation = 'multiply'; x.globalAlpha = .16 * it.lift;
@@ -621,7 +622,7 @@ class SketchPage {
       }
       case 'flutter': {
         const [ax, ay, deg] = it.axis, th = deg * Math.PI / 180;
-        const idle = reduced ? 0 : .05 * (.5 + .5 * Math.sin(t * 2.3 + it.seed)) + .03 * Math.sin(t * 7.7);
+        const idle = reduced ? 0 : .09 * (.5 + .5 * Math.sin(t * 2.3 + it.seed)) + .05 * Math.sin(t * 7.7);
         const f = 1 - (idle + it.burst * .75 * (.5 + .5 * Math.sin(t * 34)));
         x.translate(ax, ay); x.rotate(th); x.scale(1, f); x.rotate(-th); x.translate(-ax, -ay);
         x.drawImage(it.img, it.x, it.y); break;
@@ -645,7 +646,7 @@ class SketchPage {
     S.blink = Math.max(0, S.blink - dt * 5);
     const p = this.pointer;
     if (p && Math.hypot(p.x - it.head[0], p.y - it.head[1]) < 420) S.lookTo = clamp((p.x - it.head[0]) / 600, -.22, .22) + clamp((p.y - it.head[1]) / 900, -.1, .1);
-    else if (S.next < 0) { S.next = 2.5 + Math.random() * 4; S.lookTo = (Math.random() - .5) * .34; S.tiltTo = (Math.random() - .5) * .12; }
+    else if (S.next < 0) { S.next = 2 + Math.random() * 3.5; S.lookTo = (Math.random() - .5) * .5; S.tiltTo = (Math.random() - .5) * .18; }
         if (S.purr > .3) { S.tiltTo = -.14 * S.purr; S.lookTo = pp ? clamp((pp.x - it.head[0]) / 500, -.16, .16) : -.06; }
     // critically damped springs: quick to start, soft to settle
     const spring = (x, v, to, w) => { const a = -2 * w * v - w * w * (x - to); v += a * dt; return [x + v * dt, v]; };
@@ -661,11 +662,11 @@ class SketchPage {
     // breathing: the ribcage rises and the belly fills
     const br = (Math.sin(t * 1.55) * .5 + .5);
     const torso = clamp(1 - Math.abs(X - 450) / 190, 0, 1) * clamp((1150 - Y) / 140, 0, 1);
-    y -= br * 2.6 * torso; y += br * 1.6 * torso * clamp((Y - 1060) / 60, 0, 1);
+    y -= br * 3.6 * torso; y += br * 2.2 * torso * clamp((Y - 1060) / 60, 0, 1);
     // a purr is felt more than seen: a fine tremor through the body
     if (S.purr > .02) { const v = Math.sin(t * 57) * .45 * S.purr * torso; x += v; y += v * .5; }
     // weight shifting from one side to the other
-    x += Math.sin(t * .42) * 1.6 * feet;
+    x += Math.sin(t * .42) * 2.8 * feet;
     // head turns and tilts on the neck
     const [nx, ny] = it.neck, dH = Math.hypot(X - it.head[0], Y - it.head[1]);
     const hw = 1 - smooth(48, 92, dH);
@@ -685,7 +686,7 @@ class SketchPage {
     if (X < tx + 6 && Y > ty - 40) {
       const sd = clamp((tx - X) / 140, 0, 1);
       if (sd > 0) {
-        const a = (Math.sin(S.tailPhase - sd * 2.2) * (.15 - S.purr * .06) + Math.sin(t * .37) * .06 + S.purr * .42) * Math.pow(sd, 1.25);
+        const a = (Math.sin(S.tailPhase - sd * 2.2) * (.22 - S.purr * .08) + Math.sin(t * .37) * .08 + S.purr * .42) * Math.pow(sd, 1.25);
         const c = Math.cos(a), s = Math.sin(a), dx = x - tx, dy = y - ty;
         x = tx + dx * c - dy * s; y = ty + dx * s + dy * c;
       }

@@ -65,7 +65,7 @@ for pid, items in PAGES.items():
     colored = ((sat > 0.16) & (lum < 0.93)).astype(np.uint8)
     claimed = np.zeros((H, W), np.uint8)
     holes = np.zeros((H, W), np.float32)
-    clones, unders = [], []
+    clones, unders, inpaints = [], [], []
     # paper tooth from the emptiest band, for refills
     rows = [(dark[y:y + 200].mean(), y) for y in range(0, H - 200, 50)]
     by = min(rows)[1]
@@ -93,8 +93,20 @@ for pid, items in PAGES.items():
             m = (c | (ink & cv2.dilate(c, np.ones((11, 11))) & region)).astype(np.uint8)
             m = binary_fill_holes(cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9)))).astype(np.uint8)
         else:
-            m = (((dark > it['inkmin']).astype(np.uint8) if 'inkmin' in it else ink) | colored) & region
-            m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9) if text or it.get('nofill') else (21, 21)))
+            if it.get('blade'):          # the blade: its pale steel and the outline around it, nothing else
+                blue = ((P[..., 0] > P[..., 2] + 0.03) & (dark > 0.05)).astype(np.uint8) & region
+                blue = cv2.morphologyEx(blue, cv2.MORPH_CLOSE, np.ones((9, 9)))
+                n_, lab_, st_, _ = cv2.connectedComponentsWithStats(blue)
+                blade = np.isin(lab_, [i for i in range(1, n_) if st_[i, 4] > 400]).astype(np.uint8)
+                blade = binary_fill_holes(blade).astype(np.uint8)
+                m = cv2.dilate(blade, np.ones((7, 7))) & region
+                warm = (P[..., 2] > P[..., 0] + 0.06)
+                m[warm & (cv2.erode(blade, np.ones((3, 3))) == 0)] = 0
+            elif it.get('inkgray'):      # pen lines only: no food colour comes along
+                m = ((dark > 0.33) & (sat < 0.16)).astype(np.uint8) & region
+            else:
+                m = (((dark > it['inkmin']).astype(np.uint8) if 'inkmin' in it else ink) | colored) & region
+            m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9) if text or it.get('nofill') else (21, 21) if not it.get('blade') else (7, 7)))
             if not text and not it.get('nofill'):
                 m = binary_fill_holes(m).astype(np.uint8)
                 n, lab, st, _ = cv2.connectedComponentsWithStats(m)
@@ -112,12 +124,57 @@ for pid, items in PAGES.items():
         claimed |= (soft > 0.02).astype(np.uint8)
         holes = np.maximum(holes, soft)
         if 'fill' in it: clones.append((it['fill'], soft.copy()))
+        if it.get('inpaint'): inpaints.append(soft.copy())
         if it.get('remove'): continue
         img = P.copy(); alpha = soft.copy()
+        if it.get('blade'):              # the server, redrawn clean along the original's axis
+            A, B = np.array(it['axis'][0], np.float32), np.array(it['axis'][1], np.float32)
+            L = np.linalg.norm(B - A); d = (B - A) / L; n = np.array([d[1], -d[0]]) * -1   # n points to the cutting edge
+            prof = []
+            for s_ in np.linspace(0, L, 80):
+                if s_ < .3 * L:                           # handle: rounded at the end
+                    k = min(1, s_ / 10) ** .5; top, bot = 9.5 * k, 9.5 * k
+                else:                                     # blade: broad, rounding off at the tip like a server
+                    u = (s_ - .3 * L) / (.7 * L)
+                    top, bot = 11.5 * (1 - u ** 6) ** .5, 14 * (1 - u ** 2.6) ** .5
+                prof.append((A + d * s_ - n * top, A + d * s_ + n * bot))
+            poly = [p[0] for p in prof] + [p[1] for p in prof[::-1]]
+            K = np.zeros((H, W), np.uint8); cv2.fillPoly(K, [np.int32(np.round(np.array(poly) * 4))], 1, shift=2)
+            img = np.ones_like(P)
+            steel = np.array([228, 218, 206], np.float32) / 255        # BGR: pale blue-grey
+            grain = np.clip(tooth * 1.2, -0.03, 0.03)
+            img = np.where(K[..., None] > 0, np.clip(steel + grain, 0, 1), img)
+            # a soft highlight along the blade
+            for i in range(20, 79):
+                c = A + d * (L * i / 80) - n * 3
+                cv2.circle(img, tuple(np.int32(c)), 3, (0.95, 0.93, 0.9), -1, cv2.LINE_AA)
+            alpha = cv2.GaussianBlur(K.astype(np.float32), (3, 3), 0)
+            outline = [tuple(map(float, p)) for p in poly] + [tuple(map(float, poly[0]))]
+            pen_strokes(img, alpha, [outline[i:i + 30] for i in range(0, len(outline) - 1, 29)], seed=4)
+            # bolster, rivets, serrations
+            b0 = A + d * (.3 * L)
+            pen_strokes(img, alpha, [[tuple(b0 - n * 11.5), tuple(b0 + n * 14)]], seed=5)
+            for f in (.12, .24):
+                c = A + d * (f * L); cv2.circle(img, tuple(np.int32(c)), 1, tuple(PEN.tolist()), -1, cv2.LINE_AA)
+            for f in np.linspace(.38, .86, 12):
+                u = (f - .3) / .7; e = A + d * (f * L) + n * (14 * (1 - u ** 2.6) ** .5)
+                pen_strokes(img, alpha, [[tuple(e), tuple(e - n * 3 + d * 2)]], seed=int(f * 99))
+            soft = alpha
+        sol = it.get('solid') or (it.get('opaque') and isinstance(it.get('cmask'), list) and it['cmask'])
+        if sol:
+            body = poly_mask(sol) if isinstance(sol, list) else (soft > .5).astype(np.uint8)
+            body = cv2.GaussianBlur(body.astype(np.float32), (5, 5), 0)
+            inkA = np.clip((dark - 0.05) / 0.3, 0, 1)
+            alpha = soft * np.maximum(body, inkA)
         if 'under_rot' in it:        # continue the food under what lies on it: the same food, turned about its centre
-            cx, cy, deg, pts = it['under_rot']
+            cx, cy, deg, pts = it['under_rot'][:4]
+            ex, ey, rx, ry = it.get('ellipse', (cx, cy, 1, 1))
             K = cv2.dilate(poly_mask(pts), np.ones((9, 9))).astype(np.float32)
-            M = cv2.getRotationMatrix2D((cx, cy), -deg, 1.0)
+            # turn about the pizza's own ellipse, so the crust lands on the crust
+            T = lambda tx, ty: np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]], np.float64)
+            Sc = lambda a, b: np.array([[a, 0, 0], [0, b, 0], [0, 0, 1]], np.float64)
+            r = np.radians(deg); R = np.array([[np.cos(r), -np.sin(r), 0], [np.sin(r), np.cos(r), 0], [0, 0, 1]])
+            M = (T(ex, ey) @ Sc(rx, ry) @ R @ Sc(1 / rx, 1 / ry) @ T(-ex, -ey))[:2]
             rot = cv2.warpAffine(P, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
             ra = cv2.warpAffine(alpha, M, (W, H))
             f = cv2.GaussianBlur(K, (0, 0), 3)[..., None]
@@ -196,6 +253,16 @@ for pid, items in PAGES.items():
     for (dx, dy), soft in clones:
         h = np.clip(cv2.GaussianBlur(cv2.dilate(soft, np.ones((9, 9))), (0, 0), 3) * 1.3, 0, 1)[..., None]
         base = base * (1 - h) + np.roll(P, (-dy, -dx), axis=(0, 1)) * h
+    # anywhere an item was lifted out, no stray ink may stay behind
+    clean = cv2.GaussianBlur(cv2.dilate(base, np.ones((13, 13))), (0, 0), 4)
+    hole2 = np.clip(cv2.GaussianBlur(holes, (0, 0), 1.5) * 1.6, 0, 1)[..., None]
+    base = base * (1 - hole2) + np.maximum(base, clean - 0.03) * hole2
+    for soft in inpaints:            # inside a drawing: continue what is around the hole
+        K = cv2.dilate((soft > 0.02).astype(np.uint8), np.ones((7, 7)))
+        src = (np.clip(base, 0, 1) * 255).astype(np.uint8)
+        fil = cv2.inpaint(src, K, 9, cv2.INPAINT_TELEA).astype(np.float32) / 255
+        f = cv2.GaussianBlur(K.astype(np.float32), (0, 0), 1.5)[..., None]
+        base = base * (1 - f) + np.clip(fil + tooth * .6, 0, 1) * f
     for M, u in unders:
         base = base * (1 - M[..., None]) + u * M[..., None]
     if pid in SPREAD_SRC:
