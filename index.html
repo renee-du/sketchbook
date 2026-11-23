@@ -234,7 +234,7 @@ footer { display: grid; gap: 10px; justify-items: center; max-width: 560px; widt
     <ul class="hints" id="hints">
       <li><strong>Tap</strong> the sea</li>
       <li><strong>Drag</strong> the sky to move the sun</li>
-      <li><strong>Tap</strong> the treats</li>
+      <li><strong>Tap</strong> the treats (the popsicle is for eating)</li>
       <li><strong>Tap</strong> a word to hear the Italian</li>
     </ul>
   </footer>
@@ -319,6 +319,7 @@ const Sound = {
   boing() { this.blip(520, 380, .35, .14); this.blip(780, 560, .25, .05); },
   drip() { this.blip(1500, 700, .07, .12); },
   squish() { this.hiss(600, 1.5, .18, .5); this.blip(180, 110, .15, .18, 'triangle'); },
+  crunch() { [0, 45, 95].forEach((d, i) => setTimeout(() => this.hiss(2400 - i * 500, 1.2, .07, .55), d)); this.blip(160, 90, .1, .12, 'triangle'); },
 };
 
 /* ======================================================= sunset page (WebGL) */
@@ -391,6 +392,9 @@ void main(){
   }
   vec2 sp = clamp(p + disp * sea, vec2(1.), R - 1.);
   vec3 ink = texture2D(uBase, sp / R).rgb;
+  // the drawing's own stroke texture, used to lay new colour along the existing pencil
+  float stroke = smoothstep(.10, .55, 1. - min(min(ink.r, ink.g), ink.b));
+  float tooth = .35 + .65 * stroke;
 
   float horizon = 786.;                               // only used for gradients
   float yel = clamp((min(ink.r, ink.g) - ink.b) * 3.5, 0., 1.);
@@ -404,13 +408,13 @@ void main(){
     // the glow follows the sun, flattening along the horizon as it goes
     vec2 g = (p - uSunPos) * vec2(.5, 1.);
     float glow = exp(-pow(length(g) / 165., 2.)) * smoothstep(.02, .35, s) * (1. - smoothstep(.78, 1., s)) * (1. - land);
-    ink *= 1. - cover * glow * .55 * hatch(p, -.62, 1.7) * warm(clamp(s * 1.1, 0., .9));
+    ink *= 1. - glow * .5 * tooth * warm(clamp(s * 1.1, 0., .9));
     float band = exp(-pow((horizon - 40. - p.y) / 95., 2.)) * smoothstep(.55, .85, s) * (1. - smoothstep(.97, 1.2, s) * .4);
-    ink *= 1. - cover * band * .5 * hatch(p, -.5, 4.1) * warm(.72 + s * .2);
+    ink *= 1. - band * .45 * tooth * warm(.72 + s * .2);
     // dusk settles from the top of the page
-    float dusk = smoothstep(.55, 1., s) * pow(clamp(1. - p.y / horizon, 0., 1.), .6) * (.35 + .65 * cover);
-    ink = pow(ink, vec3(1. + dusk * .8));
-    ink *= 1. - dusk * .6 * hatch(p, -.6, 7.3) * vec3(.36, .31, .10) * cover;
+    float dusk = smoothstep(.55, 1., s) * pow(clamp(1. - p.y / horizon, 0., 1.), .6);
+    ink = pow(ink, vec3(1. + dusk * 1.1));
+    ink *= 1. - dusk * .55 * tooth * vec3(.36, .31, .10);
     // mountains go to silhouette
     float m = land * (1. - sea);
     ink = mix(ink, pow(ink, vec3(1. + s * 1.1)) * (1. - s * .12 * vec3(.5, .55, .3)), m);
@@ -427,9 +431,9 @@ void main(){
     ink = clamp(c, 0., 1.);
     float d = smoothstep(.5, 1., s);
     ink = pow(ink, vec3(1. + d * .6));
-    ink *= 1. - d * .38 * cover * hatch(p, .03, 3.3) * vec3(.34, .26, .08);
+    ink *= 1. - d * .38 * cover * tooth * vec3(.34, .26, .08);
     // ripples drawn like pencil: crests erase toward paper, troughs press harder
-    float grain = .45 + .55 * hatch(p, .02, 11.);
+    float grain = .45 + .55 * stroke;
     float crest = max(shade, 0.), trough = max(-shade, 0.);
     ink = mix(ink, vec3(1.), clamp(crest * .95 * grain, 0., .85));
     ink *= 1. - clamp(crest * colx * refl * 1.3 * grain, 0., .9) * vec3(.0, .10, .55);
@@ -544,7 +548,7 @@ class Sunset {
     const dir = calm ? (Math.random() < .5 ? -1 : 1) : (x < PW / 2 ? 1 : -1);
     for (let i = 0; i < n; i++) {
       this.birds.push({
-        x: x + (Math.random() - .5) * 50, y: y + (Math.random() - .5) * 30,
+        x: x + (Math.random() - .5) * 110 + i * dir * -26, y: y + (Math.random() - .5) * 60,
         vx: dir * (55 + Math.random() * 40), vy: -(calm ? 4 : 18) - Math.random() * 14,
         ph: Math.random() * 6, fr: 7 + Math.random() * 3, sc: (calm ? .8 : 1.15) + Math.random() * .35,
         shrink: calm ? .015 : .06, age: 0, seed: Math.random() * 100,
@@ -558,24 +562,21 @@ class Sunset {
     x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, b.width, b.height);
     if (!this.birds.length) return;
     x.setTransform(k, 0, 0, k, 0, 0);
-    x.lineCap = 'round'; x.lineJoin = 'round';
-    const dark = lerp(.55, .8, this.s);
     this.birds = this.birds.filter((bd) => {
       bd.age += dt; bd.ph += dt * bd.fr; bd.x += bd.vx * dt * bd.sc; bd.y += bd.vy * dt; bd.vy *= (1 - dt * .3);
-      bd.sc = Math.max(.25, bd.sc - bd.shrink * dt);
+      bd.sc = Math.max(.3, bd.sc - bd.shrink * dt);
       const alpha = Math.min(1, bd.age * 4) * (1 - smooth(7, 9, bd.age));
       if (bd.x < -60 || bd.x > PW + 60 || bd.y < -40 || alpha <= 0) return false;
-      const sp = 15 * bd.sc, f = Math.sin(bd.ph), up = 7 * bd.sc;
-      for (let j = 0; j < 3; j++) {           // three light passes = pencil
-        const jx = (Math.sin(bd.seed + j * 7.1) * .6), jy = (Math.cos(bd.seed + j * 3.3) * .6);
-        x.strokeStyle = `rgba(48, 50, 66, ${(.32 + j * .08) * alpha * dark / .55})`;
-        x.lineWidth = (1.1 + j * .25) * Math.sqrt(bd.sc);
-        x.beginPath();
-        x.moveTo(bd.x - sp + jx, bd.y - f * up * .9 + jy);
-        x.quadraticCurveTo(bd.x - sp * .45 + jx, bd.y - up * (.5 + .5 * f) - 2 + jy, bd.x + jx * .3, bd.y + 1.5 * bd.sc);
-        x.quadraticCurveTo(bd.x + sp * .45 - jx, bd.y - up * (.5 + .5 * f) - 2 - jy, bd.x + sp - jx, bd.y - f * up * .9 - jy);
-        x.stroke();
-      }
+      const sp = 19 * bd.sc, f = Math.sin(bd.ph), up = 9 * bd.sc;
+      const tipY = bd.y - f * up, ctlY = bd.y - up * (.55 + .45 * f) - 3 * bd.sc;
+      const dir = Math.sign(bd.vx) || 1;
+      // one continuous fineliner stroke: tip -> body -> tip, like the cherry stem
+      const wing = (side) => [
+        [bd.x + side * sp, tipY + side * dir * 1.2 * bd.sc],
+        [bd.x + side * sp * .42, ctlY],
+        [bd.x, bd.y + 1.2 * bd.sc],
+      ];
+      penStroke(x, [...wing(-1), ...wing(1).reverse().slice(1)], bd.seed, Math.min(1.15, .75 + bd.sc * .3), alpha);
       return true;
     });
   }
@@ -602,6 +603,36 @@ class Sunset {
   }
 }
 
+/* A line in the artist's fineliner: the same blue-black ink as the labels (sampled
+   from the scan), ~3px wide on the page, a little heavier mid-stroke, lifting at the ends. */
+const PEN = [52, 61, 64];
+function penStroke(x, pts, seed, scale, alpha) {
+  const path = [];
+  for (let i = 0; i + 2 < pts.length; i += 2) {
+    const [a, c, b] = [pts[i], pts[i + 1], pts[i + 2]];
+    for (let j = i ? 1 : 0; j <= 14; j++) {
+      const t = j / 14, u = 1 - t;
+      path.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]);
+    }
+  }
+  const n = path.length, L = [], R = [];
+  for (let i = 0; i < n; i++) {
+    const p = path[i], q = path[Math.min(n - 1, i + 1)], o = path[Math.max(0, i - 1)];
+    let tx = q[0] - o[0], ty = q[1] - o[1]; const len = Math.hypot(tx, ty) || 1; tx /= len; ty /= len;
+    const t = i / (n - 1);
+    const w = 1.55 * scale * (.35 + .65 * Math.pow(Math.sin(Math.PI * t), .45)) * (1 + .12 * Math.sin(t * 9 + seed));
+    const wob = Math.sin(t * 7.3 + seed * 3.1) * .35 * scale;
+    L.push([p[0] - ty * (w + wob), p[1] + tx * (w + wob)]);
+    R.push([p[0] + ty * (w - wob), p[1] - tx * (w - wob)]);
+  }
+  x.beginPath();
+  L.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])));
+  for (let i = n - 1; i >= 0; i--) x.lineTo(R[i][0], R[i][1]);
+  x.closePath();
+  x.fillStyle = `rgba(${PEN}, ${.86 * alpha})`; x.fill();
+  x.lineWidth = 1.2; x.lineJoin = 'round'; x.strokeStyle = `rgba(${PEN}, ${.18 * alpha})`; x.stroke();  // soft edge like the scan
+}
+
 /* ======================================================= treats page (2D) */
 const ITALIAN = {
   lbl_melon:   { it: 'anguria', say: 'anguria', hint: 'an·gu·RÌ·a' },
@@ -625,7 +656,8 @@ class Treats {
     const order = ['lbl_melon', 'lbl_bracket', 'lbl_cherry', 'lbl_pop', 'lbl_eclair', 'melon1', 'melon2', 'melon0', 'eclair', 'popsicle', 'cherry'];
     this.items.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
     this.by = Object.fromEntries(this.items.map((i) => [i.name, i]));
-    this.drops = [];
+    this.drops = []; this.crumbs = [];
+    this.setupPopsicle();
     this.writeT = reduced ? 99 : -0.3;
     this.off = document.createElement('canvas'); this.ox = this.off.getContext('2d');
     this.bindInput();
@@ -660,8 +692,7 @@ class Treats {
       it.vr += (px < it.pv[0] - 20 ? -1 : 1) * (3.2 + Math.random());
       Sound.boing();
     } else if (n === 'popsicle') {
-      it.vr += (px < it.pv[0] ? -1 : 1) * 1.6; it.vsq -= 1.4;
-      this.drip(); Sound.squish();
+      this.bite(it, px, py);
     } else if (n === 'eclair') {
       it.sq = -.12; it.vsq = -1.5; it.vr += (px < it.pv[0] ? -.4 : .4);
       Sound.squish();
@@ -670,9 +701,97 @@ class Treats {
     }
   }
   drip() {
-    const spots = [[492, 552], [578, 601], [716, 570], [540, 590]];
+    const spots = [[492, 552], [540, 590], [578, 601], [636, 596]].filter(([sx]) => sx > this.popFront + 20);
+    if (!spots.length) return;
     const [x, y] = spots[Math.random() * spots.length | 0];
     this.drops.push({ x, y, y0: y, vy: 0, len: 0, age: 0, state: 'grow', puddle: 0 });
+  }
+  /* ---- the popsicle gets eaten, one bite per tap, from the tip toward the stick */
+  setupPopsicle() {
+    const it = this.by.popsicle; this.pop = it;
+    const c = document.createElement('canvas'); c.width = it.w; c.height = it.h;
+    this.popOrig = it.img; it.img = c; this.popCtx = c.getContext('2d', { willReadFrequently: true });
+    // the stick (page px) is never eaten
+    this.stick = [[676, 512], [700, 504], [760, 518], [784, 546], [772, 563], [722, 560], [678, 549]];
+    this.biteSeq = [[466, 468, 60], [500, 545, 58], [536, 438, 62], [570, 532, 62], [606, 446, 64], [636, 548, 60], [662, 462, 62]];
+    this.resetPopsicle();
+  }
+  resetPopsicle() {
+    const it = this.pop, x = this.popCtx;
+    x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, it.w, it.h); x.drawImage(this.popOrig, 0, 0);
+    it.alpha = alphaOf(it.img); this.bites = 0; this.popFront = 0;
+  }
+  stickPath(x, grow = 0) {
+    const it = this.pop; x.beginPath();
+    this.stick.forEach(([px, py], i) => { const X = px - it.x + (px > 730 ? grow : 0), Y = py - it.y; i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+    x.closePath();
+  }
+  biteShape(x, cx, cy, r, grow) {
+    // a jaw: one round bite with a row of teeth marks scalloping its rim
+    x.beginPath(); x.arc(cx, cy, r - 5 + grow, 0, Math.PI * 2); x.fill();
+    const n = Math.round(2 * Math.PI * r / 15);
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2;
+      x.beginPath(); x.arc(cx + Math.cos(a) * (r - 6), cy + Math.sin(a) * (r - 6), 9.5 + grow, 0, Math.PI * 2); x.fill();
+    }
+  }
+  bite(it, px, py) {
+    if (this.bites > this.biteSeq.length) {           // only the stick left: hand over a fresh one
+      this.resetPopsicle(); it.sq = -.32; it.vsq = 4; it.vr = .5;
+      Sound.blip(420, 840, .18, .12); Sound.blip(640, 1280, .22, .06);
+      return;
+    }
+    const W = it.w, H = it.h, ctx = this.popCtx;
+    const before = ctx.getImageData(0, 0, W, H);
+    const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H; const t = tmp.getContext('2d');
+    const last = this.bites === this.biteSeq.length;
+    const shapes = last ? null : this.biteSeq[this.bites];
+    const shape = (g, grow) => {
+      if (last) { g.fillRect(0, 0, W, H); return; }
+      const [bx, by, r] = shapes; this.biteShape(g, bx - it.x, by - it.y, r, grow);
+    };
+    // cut face: a band of pale cheesecake just inside the new edge, then the pen line on the edge
+    if (!last) {
+      t.fillStyle = 'rgb(238, 236, 214)'; shape(t, 11);
+      t.globalCompositeOperation = 'destination-out'; shape(t, 2.6);
+      t.globalCompositeOperation = 'source-over'; t.fillStyle = `rgb(${PEN})`;
+      const ring = document.createElement('canvas'); ring.width = W; ring.height = H; const rg = ring.getContext('2d');
+      rg.fillStyle = `rgb(${PEN})`; shape(rg, 2.8); rg.globalCompositeOperation = 'destination-out'; shape(rg, 0);
+      t.drawImage(ring, 0, 0);
+      t.globalCompositeOperation = 'destination-in'; t.drawImage(it.img, 0, 0);      // only where there is still popsicle
+      t.globalCompositeOperation = 'destination-out'; this.stickPath(t); t.fill();
+      t.globalCompositeOperation = 'source-over';
+    }
+    // crumbs: real pixels from the bitten part
+    const mask = document.createElement('canvas'); mask.width = W; mask.height = H; const mk = mask.getContext('2d');
+    shape(mk, 0); mk.globalCompositeOperation = 'destination-out'; this.stickPath(mk); mk.fill();
+    const md = mk.getImageData(0, 0, W, H).data, bd = before.data;
+    let tries = 0, made = 0;
+    while (made < 14 && tries++ < 600) {
+      const X = Math.random() * W | 0, Y = Math.random() * H | 0, i = (Y * W + X) * 4;
+      if (md[i + 3] > 128 && bd[i + 3] > 200) {
+        this.crumbs.push({ x: X + it.x, y: Y + it.y, vx: (Math.random() - .7) * 160, vy: -Math.random() * 220 - 40, r: Math.random() * 6, vr: (Math.random() - .5) * 18,
+          s: 1.6 + Math.random() * 2.4, col: `rgb(${bd[i]},${bd[i + 1]},${bd[i + 2]})`, floor: 598 + Math.random() * 34, age: 0 });
+        made++;
+      }
+    }
+    // take the bite
+    ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(mask, 0, 0);
+    ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(tmp, 0, 0);
+    it.alpha = alphaOf(it.img);
+    this.bites++;
+    this.popFront = last ? 999 : shapes[0] + shapes[2] * .6;
+    it.vr += -.9 - Math.random() * .4; it.sq = -.06; it.vsq -= 1.2;
+    Sound.crunch();
+    if (!last && Math.random() < .5) this.drip();
+    if (last) setTimeout(() => this.pill('finito!', 'tap the stick for another', it), 350);
+  }
+  pill(main, sub, it) {
+    const host = this.c.parentElement; host.querySelectorAll('.say').forEach((n) => n.remove());
+    const pill = document.createElement('div'); pill.className = 'say';
+    pill.innerHTML = '<b></b><span></span>'; pill.querySelector('b').textContent = main; pill.querySelector('span').textContent = sub;
+    pill.style.left = clamp((it.x + it.w * .7) / PW * 100, 18, 82) + '%'; pill.style.top = ((it.y + 110) / PH * 100) + '%';
+    host.appendChild(pill); setTimeout(() => pill.remove(), 2700);
   }
   say(name, px, py) {
     const w = ITALIAN[name]; if (!w) return;
@@ -740,6 +859,12 @@ class Treats {
       else { d.puddle = Math.min(1, d.puddle + dt * 3); }
     }
     this.drops = this.drops.filter((d) => d.age < 6);
+    for (const c of this.crumbs) {
+      c.age += dt;
+      if (c.y < c.floor) { c.vy += 1500 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.r += c.vr * dt; }
+      if (c.y >= c.floor) { c.y = c.floor; if (c.vy > 120) { c.vy *= -.28; c.vx *= .5; c.y -= .5; } else { c.vy = 0; c.vx = 0; } }
+    }
+    this.crumbs = this.crumbs.filter((c) => c.age < 5);
   }
   draw() {
     const x = this.x, k = this.c.width / PW;
@@ -774,6 +899,14 @@ class Treats {
     }
     // drips, inked like the drawing: cream fill, quick dark outline
     x.setTransform(k, 0, 0, k, 0, 0);
+    for (const c of this.crumbs) {
+      x.globalAlpha = 1 - smooth(3.4, 5, c.age);
+      x.fillStyle = c.col;
+      x.save(); x.translate(c.x, c.y); x.rotate(c.r);
+      x.beginPath(); x.moveTo(-c.s, -c.s * .6); x.lineTo(c.s * .8, -c.s * .8); x.lineTo(c.s, c.s * .5); x.lineTo(-c.s * .5, c.s * .8); x.closePath(); x.fill();
+      x.restore();
+    }
+    x.globalAlpha = 1;
     for (const d of this.drops) {
       const fade = 1 - smooth(4, 6, d.age);
       x.globalAlpha = fade;

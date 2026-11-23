@@ -62,6 +62,8 @@ sea = np.clip((yy - hz[None] - 1) / 3, 0, 1)
 land = np.clip((yy - mt[None] + 2) / 4, 0, 1)
 depth = np.clip((yy - hz[None]) / (H - hz[None]), 0, 1)
 save('right_geo.png', np.dstack([depth, land, sea]))
+sys.path.insert(0, os.path.dirname(__file__)); from fill_sky import fill_sky
+R = fill_sky(R, land); lum = R.mean(2)
 cov = cv2.dilate((lum < 0.95).astype(np.uint8), np.ones((31, 31))).astype(np.float32)
 cov = cv2.GaussianBlur(cov, (0, 0), 14)
 cv2.imwrite(f'{OUT}/right_cover.png', (cov * 255).astype(np.uint8))  # bgr -> r=sea g=land b=depth
@@ -92,7 +94,7 @@ dark = (1 - L.min(2))
 items = {   # x0,y0,x1,y1 boxes (page px)
   'melon':   (70, 300, 318, 545),
   'cherry':  (272, 255, 405, 412),
-  'popsicle':(470, 380, 790, 615),
+  'popsicle':(470, 374, 790, 632),
   'eclair':  (190, 585, 650, 775),
   'lbl_melon':   (95, 160, 505, 232),
   'lbl_bracket': (70, 245, 120, 390),
@@ -115,7 +117,9 @@ for name, (x0, y0, x1, y1) in items.items():
         m[255:352, 392:440] = ink_mask[255:352, 392:440]
     k = 9 if name.startswith('lbl') else 15
     if name == 'melon': m[:405, :106] = 0; m[:388, 256:] = 0
-    if name == 'popsicle': m[:412, 690:] = 0
+    if name == 'popsicle': m[:412, 696:] = 0
+    if name == 'lbl_pop': m[378:, :696] = 0
+    if name == 'eclair': m[:628, 505:] = 0
     if not name.startswith('lbl'): k = 21
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((k, k)))
     if not name.startswith('lbl'):   # fill interior holes
@@ -155,6 +159,11 @@ den = cv2.GaussianBlur(keep, (0, 0), 18)[..., None]
 wash = num / np.maximum(den, 1e-3)
 conf = np.clip((den - 0.15) / 0.35, 0, 1)
 wash = 1 - (1 - np.clip(wash, 0, 1)) * 0.8 * conf
+# give the filled holes the scan's paper tooth, borrowed from blank paper lower down
+blank = L[930:1230]                     # an empty band of the page
+nb = np.vstack([blank] * (H // 300 + 1))[:H]
+tooth = nb - cv2.GaussianBlur(nb, (0, 0), 4)
+wash = np.clip(wash + tooth * 0.9, 0, 1)
 fill = L * keep[..., None] + wash * (1 - keep[..., None])
 save('left_base.webp', fill)
 
