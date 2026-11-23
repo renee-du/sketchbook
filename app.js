@@ -1484,7 +1484,24 @@ class SketchPage {
     S.nextBlink -= dt; if (S.nextBlink < 0) { S.nextBlink = 2.5 + Math.random() * 4; S.blink = 1; }
     S.blink = Math.max(0, S.blink - dt * 5);
     const p = this.pointer;
-    if (p && Math.hypot(p.x - it.head[0], p.y - it.head[1]) < 420) S.lookTo = clamp((p.x - it.head[0]) / 600, -.22, .22) + clamp((p.y - it.head[1]) / 900, -.1, .1);
+    // left alone, the cat gets on with its own life: looks about, sniffs, stretches, swishes its tail
+    if (!S.act || t - S.act.t > S.act.dur) {
+      if (S.act) S.rest = t + 1 + Math.random() * 2.5, S.act = null;
+      if (S.purr < .2 && (!S.rest || t > S.rest)) {
+        const k = ['scan', 'sniff', 'stretch', 'swish', 'scan', 'swish'][Math.random() * 6 | 0];
+        S.act = { k, t, dur: { scan: 3.2, sniff: 2.2, stretch: 3.4, swish: 2.6 }[k], dir: Math.random() < .5 ? -1 : 1 };
+        if (k === 'stretch') S.ear[0] = S.ear[1] = t;
+      }
+    }
+    const A = S.act, au = A ? clamp((t - A.t) / A.dur, 0, 1) : 0, env = A ? Math.sin(au * Math.PI) : 0;
+    S.stretch = A && A.k === 'stretch' ? Math.pow(env, .7) : 0;
+    S.sniff = A && A.k === 'sniff' ? env : 0;
+    S.swish = Math.max(S.swish * Math.exp(-dt * 1.5), A && A.k === 'swish' ? env : 0);
+    const moved = p && this.lastMoveT !== undefined && t - this.lastMoveT < 2.5;
+    if (p && this.lastP && (p.x !== this.lastP.x || p.y !== this.lastP.y)) this.lastMoveT = t;
+    if (A && A.k === 'scan' && !moved) { S.lookTo = A.dir * (au < .5 ? .3 : -.24); S.tiltTo = A.dir * .06; }
+    else if (S.sniff) { S.lookTo = -.12; S.tiltTo = .05; }
+    else if (moved && Math.hypot(p.x - it.head[0], p.y - it.head[1]) < 420) S.lookTo = clamp((p.x - it.head[0]) / 600, -.22, .22) + clamp((p.y - it.head[1]) / 900, -.1, .1);
     else if (S.next < 0) { S.next = 2 + Math.random() * 3.5; S.lookTo = (Math.random() - .5) * .5; S.tiltTo = (Math.random() - .5) * .18; }
         if (S.purr > .3) { S.tiltTo = -.14 * S.purr; S.lookTo = pp ? clamp((pp.x - it.head[0]) / 500, -.16, .16) : -.06; }
     // critically damped springs: quick to start, soft to settle
@@ -1492,7 +1509,7 @@ class SketchPage {
     [S.look, S.lookV] = spring(S.look, S.lookV, S.lookTo, 5.5);
     [S.tilt, S.tiltV] = spring(S.tilt, S.tiltV, S.tiltTo, 4);
     S.nextEar -= dt; if (S.nextEar < 0) { S.nextEar = 2 + Math.random() * 5; S.ear[Math.random() < .5 ? 0 : 1] = t; }
-    S.tailPhase += dt * (.9 + S.purr * .3);
+    S.tailPhase += dt * (.9 + S.purr * .3 + S.swish * 2.2);
     return S;
   }
   warpAt(it, S, X, Y, t) {
@@ -1502,6 +1519,16 @@ class SketchPage {
     const br = (Math.sin(t * 1.55) * .5 + .5);
     const torso = clamp(1 - Math.abs(X - 450) / 190, 0, 1) * clamp((1150 - Y) / 140, 0, 1);
     y -= br * 3.6 * torso; y += br * 2.2 * torso * clamp((Y - 1060) / 60, 0, 1);
+    // the stretch: front end lowers and reaches, hindquarters rise
+    if (S.stretch > .01) {
+      const front = clamp((X - 420) / 160, 0, 1), rear = clamp((420 - X) / 160, 0, 1), up = clamp((1180 - Y) / 200, 0, 1);
+      y += S.stretch * (9 * front - 5 * rear) * up; x += S.stretch * 7 * front * up;
+    }
+    // sniffing: the head dips toward the ground, nose twitching
+    if (S.sniff > .01) {
+      const hw2 = 1 - smooth(40, 100, Math.hypot(X - it.head[0], Y - it.head[1]));
+      y += S.sniff * (8 + Math.sin(t * 22) * 1.2) * hw2; x += S.sniff * 4 * hw2;
+    }
     // a purr is felt more than seen: a fine tremor through the body
     if (S.purr > .02) { const v = Math.sin(t * 57) * .45 * S.purr * torso; x += v; y += v * .5; }
     // weight shifting from one side to the other
@@ -1525,7 +1552,7 @@ class SketchPage {
     if (X < tx + 6 && Y > ty - 40) {
       const sd = clamp((tx - X) / 140, 0, 1);
       if (sd > 0) {
-        const a = (Math.sin(S.tailPhase - sd * 2.2) * (.22 - S.purr * .08) + Math.sin(t * .37) * .08 + S.purr * .42) * Math.pow(sd, 1.25);
+        const a = (Math.sin(S.tailPhase - sd * 2.2) * (.22 - S.purr * .08 + S.swish * .2) + Math.sin(t * .37) * .08 + S.purr * .42) * Math.pow(sd, 1.25);
         const c = Math.cos(a), s = Math.sin(a), dx = x - tx, dy = y - ty;
         x = tx + dx * c - dy * s; y = ty + dx * s + dy * c;
       }
