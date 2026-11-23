@@ -40,7 +40,7 @@ class Curl {
     [front, back].forEach((img, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.tex[i]); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); });
   }
   /* theta: 0 (lying flat where it started) .. PI (lying on the other side). dir: 1 right->left, -1 left->right */
-  draw(theta, dir, grabV, lay) {
+  draw(theta, dir, grabV, lay, peek = 0) {
     const gl = this.gl; if (!gl) return null;
     const dpr = Math.min(devicePixelRatio || 1, 2), r = this.c.getBoundingClientRect();
     const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
@@ -57,6 +57,8 @@ class Curl {
       for (let i = 0; i <= NU; i++) {
         const u = i / NU;
         a = theta - bend * Math.pow(u, 1.25) * lagK * .62;
+        // hovering: just the corner under the pointer lifts, curling up off the page
+        if (peek > 0) a += peek * 1.25 * Math.pow(clamp((u - .5) / .5, 0, 1), 1.7) * Math.exp(-Math.pow((v - grabV) / .3, 2));
         a = clamp(a, 0, Math.PI);
         if (i > 0) { x += Math.cos(a) * pw / NU; z += Math.sin(a) * pw / NU; }
         const X = dir * x, Y = (v - .5) * ph, k = f / (f - z);

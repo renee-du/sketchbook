@@ -1162,11 +1162,22 @@ class SketchPage {
   /* serve a slice: it lifts away trailing strings of melted cheese that stretch, thin and snap */
   slice(it) {
     const knife = it.knife && this.by[it.knife];
+    if (knife && knife.saw) return;
     if (it.wedge >= it.wedges.length) {
       editable(it); it.wedge = 0; it.done = 0; it.sq = -.25; it.vsq = 3;
-      if (knife) { knife.op = 0; knife.back = 0; }
-      Sound.blip(420, 840, .18, .12); return;
+      if (knife) knife.anim2 = { t: 0, from: [knife.tx, knife.ty, knife.rot], to: [0, 0, 0], dur: .8 };
+      return;
     }
+    if (knife) {              // the knife comes over, saws along the new cut, then lifts away
+      const a1 = it.wedges[it.wedge][1] * Math.PI / 180, dir = [Math.cos(a1), Math.sin(a1)];
+      const mid = [it.c[0] + dir[0] * 105, it.c[1] + dir[1] * 105];
+      knife.saw = { t: 0, from: [knife.tx, knife.ty, knife.rot], to: [mid[0] - knife.pv[0], mid[1] - knife.pv[1], a1 + .33], dir, pizza: it };
+      return;
+    }
+    this.cutSlice(it);
+  }
+  cutSlice(it) {
+    const knife = it.knife && this.by[it.knife];
     const wi = it.wedge, [a0, a1] = it.wedges[it.wedge++];
     const [cx, cy] = [it.c[0] - it.x, it.c[1] - it.y];
     const W = it.w, H = it.h, ctx = it.ctx;
@@ -1186,9 +1197,6 @@ class SketchPage {
       bg.putImageData(d, 0, 0); it.body = bc;
     }
     const [piece, pg] = mk(); pg.drawImage(it.img, 0, 0); pg.globalCompositeOperation = 'destination-in'; wedge(pg);
-    if (knife && wi === it.knifeWedge) {       // the server goes with the slice it lies on
-      pg.globalCompositeOperation = 'source-over'; pg.drawImage(knife.img, knife.x - it.x, knife.y - it.y); knife.op = 0;
-    }
     ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; wedge(ctx); ctx.stroke();
     // ink the new cut edges, only where pizza is still on the pan
     const [cut, cg] = mk();
@@ -1259,6 +1267,23 @@ class SketchPage {
       it.gustAmt = Math.max(0, it.gustAmt - dt * .55);
       if (it.state) this.updateToss(it, dt);
       if (it.anim) this.updateTool(it, dt);
+      if (it.saw) {
+        const sw = it.saw; sw.t += dt;
+        const T1 = .5, T2 = 1.5, T3 = 2.1;
+        if (sw.t < T1) { const u = ease(sw.t / T1); it.tx = lerp(sw.from[0], sw.to[0], u); it.ty = lerp(sw.from[1], sw.to[1], u) - Math.sin(u * Math.PI) * 30; it.rot = lerp(sw.from[2], sw.to[2], u); }
+        else if (sw.t < T2) {
+          const u = (sw.t - T1) / (T2 - T1), stroke = Math.sin(u * Math.PI * 7) * 16 * (1 - u * .3), press = Math.sin(u * Math.PI * 14) * .8;
+          it.tx = sw.to[0] + sw.dir[0] * stroke; it.ty = sw.to[1] + sw.dir[1] * stroke + press; it.rot = sw.to[2];
+          if (!sw.marked && u > .15) { sw.marked = true; this.fx.push({ k: 'cutline', it: sw.pizza, a: Math.atan2(sw.dir[1], sw.dir[0]), age: 0, life: T2 - T1 }); }
+          if (Math.random() < dt * 14) { const r = 30 + Math.random() * 150; const px = sw.pizza.c[0] + sw.dir[0] * r, py = sw.pizza.c[1] + sw.dir[1] * r; this.fx.push({ k: 'crumb', x: px, y: py, vx: (Math.random() - .5) * 60, vy: -60 - Math.random() * 60, r: 0, vr: 6, s: 1.2 + Math.random(), col: Math.random() < .5 ? 'rgb(222,140,96)' : 'rgb(236,206,150)', floor: py + 8, age: 0 }); }
+        } else {
+          if (!sw.cut) { sw.cut = true; this.cutSlice(sw.pizza); sw.from2 = [it.tx, it.ty, it.rot]; }
+          const rest = sw.pizza.rest, u = ease((sw.t - T2) / (T3 - T2));
+          const to = [rest[0] - it.pv[0], rest[1] - it.pv[1], rest[2]];
+          it.tx = lerp(sw.from2[0], to[0], u); it.ty = lerp(sw.from2[1], to[1], u) - Math.sin(u * Math.PI) * 40; it.rot = lerp(sw.from2[2], to[2], u);
+          if (sw.t >= T3) it.saw = null;
+        }
+      }
       if (it.anim2) {
         const a = it.anim2, D = a.dur || .7; a.t += dt;
         const v = clamp(a.t / D, 0, 1), u = 1 - Math.pow(1 - v, 3) + Math.sin(v * Math.PI) * .06;     // eases out with a touch of overshoot
@@ -1274,7 +1299,11 @@ class SketchPage {
         }
       }
     }
-    if (this.cat) this.cat.update(t, dt, this.pointer);
+    if (!reduced) for (const it of this.items) {
+      if (it.steam && it.op > .5 && !it.done && Math.random() < dt * 1.3) { const [sx, sy] = it.steam[Math.random() * it.steam.length | 0]; this.fx.push({ k: 'steam', x: sx + (Math.random() - .5) * 30, y: sy, age: 0, life: 3.2, seed: Math.random() * 9 }); }
+      if (it.fizz && it.drunk < .9 && Math.random() < dt * 2.2) { const [x0, y0, x1, y1] = it.fizz; this.fx.push({ k: 'bubble', it, x: x0 + Math.random() * (x1 - x0), y: y1 - Math.random() * 20, r: 1.4 + Math.random() * 1.8, age: 0, life: 2.4, seed: Math.random() * 9, slow: true }); }
+      if (it.glint && it.op > .5 && Math.random() < dt * .12) this.fx.push({ k: 'spark', x: it.glint[0] + it.tx, y: it.glint[1] + it.ty, age: 0, seed: Math.random() * 9, small: true });
+    }
     if (!reduced && this.zones.some((z) => z.zone === 'birds')) { this.nextBird = (this.nextBird ?? 8) - dt; if (this.nextBird < 0) { this.nextBird = 18 + Math.random() * 16; this.flock(Math.random() < .5 ? -20 : PW + 20, 120 + Math.random() * 120, 1 + (Math.random() * 2 | 0)); } }
     for (const f of this.fx) {
       f.age += dt; if (f.age < 0) continue;
@@ -1285,7 +1314,8 @@ class SketchPage {
           break;
         case 'drop': f.vy += 900 * dt; f.x += f.vx * dt; f.y += f.vy * dt; break;
         case 'bird': f.ph += dt * f.fr; f.x += f.vx * dt * f.sc; f.y += f.vy * dt; f.vy *= 1 - dt * .4; f.sc = Math.max(.35, f.sc - dt * .05); break;
-        case 'bubble': f.y -= dt * 38; break;
+        case 'bubble': f.y -= dt * (f.slow ? 22 : 38); break;
+        case 'steam': f.y -= dt * 26; f.x += Math.sin(f.age * 1.7 + f.seed) * dt * 10; break;
         case 'drip':
           if (f.state === 'grow') { f.len = Math.min(1, f.len + dt * (f.slow ? .7 : 1.1)); if (f.len >= 1) f.state = 'fall'; }
           else if (f.state === 'fall') { f.vy += (f.slow ? 260 : 900) * dt; f.y += f.vy * dt; if (f.y > f.y0 + (f.slow ? 34 : 50)) { f.state = 'pool'; } }
@@ -1293,7 +1323,7 @@ class SketchPage {
           break;
       }
     }
-    const life = { crumb: 5, drop: .7, bird: 8, bubble: 1.2, drip: 6, ring: 1.8, spark: 1, mark: .9 };
+    const life = { crumb: 5, drop: .7, bird: 8, bubble: 1.2, steam: 3.2, drip: 6, ring: 1.8, spark: 1, mark: .9 };
     this.fx = this.fx.filter((f) => f.age < (f.life || life[f.k] || 2) && !(f.k === 'bird' && (f.x < -80 || f.x > PW + 80 || f.y < -60)));
   }
   updateToss(it, dt) {
@@ -1442,21 +1472,26 @@ class SketchPage {
   /* the cat breathes, shifts its weight, looks about, flicks its ears and swishes its tail:
      the drawing itself is gently bent on a fine mesh, so the linework stays the artist's */
   catState(it, t, dt) {
-    const S = it.cs || (it.cs = { look: 0, lookV: 0, lookTo: 0, next: 2, tilt: 0, tiltV: 0, tiltTo: 0, ear: [-9, -9], nextEar: 2.5, swish: 0, tailPhase: 0 });
+    const S = it.cs || (it.cs = { look: 0, lookV: 0, lookTo: 0, next: 2, tilt: 0, tiltV: 0, tiltTo: 0, ear: [-9, -9], nextEar: 2.5, swish: 0, tailPhase: 0, purr: 0, blink: 0, nextBlink: 3, stroke: 0 });
     S.next -= dt;
+    // stroking: the pointer moving over the cat keeps it purring
+    const pp = this.pointer;
+    if (pp && this.lastP && pp.x > it.x && pp.x < it.x + it.w && pp.y > it.y && pp.y < it.y + it.h) S.stroke = Math.min(1, S.stroke + Math.hypot(pp.x - this.lastP.x, pp.y - this.lastP.y) * .004);
+    S.stroke = Math.max(0, S.stroke - dt * .25);
+    const wantPurr = (it.petT !== undefined && t - it.petT < 4.5) || S.stroke > .2 ? 1 : 0;
+    S.purr += (wantPurr - S.purr) * (1 - Math.exp(-dt * (wantPurr ? 2.4 : .9)));
+    S.nextBlink -= dt; if (S.nextBlink < 0) { S.nextBlink = 2.5 + Math.random() * 4; S.blink = 1; }
+    S.blink = Math.max(0, S.blink - dt * 5);
     const p = this.pointer;
     if (p && Math.hypot(p.x - it.head[0], p.y - it.head[1]) < 420) S.lookTo = clamp((p.x - it.head[0]) / 600, -.22, .22) + clamp((p.y - it.head[1]) / 900, -.1, .1);
     else if (S.next < 0) { S.next = 2.5 + Math.random() * 4; S.lookTo = (Math.random() - .5) * .34; S.tiltTo = (Math.random() - .5) * .12; }
-    const petted = it.petT !== undefined && t - it.petT < 2.6;
-    if (petted) { S.tiltTo = .16; S.lookTo = -.08; }
+        if (S.purr > .3) { S.tiltTo = -.14 * S.purr; S.lookTo = pp ? clamp((pp.x - it.head[0]) / 500, -.16, .16) : -.06; }
     // critically damped springs: quick to start, soft to settle
     const spring = (x, v, to, w) => { const a = -2 * w * v - w * w * (x - to); v += a * dt; return [x + v * dt, v]; };
     [S.look, S.lookV] = spring(S.look, S.lookV, S.lookTo, 5.5);
     [S.tilt, S.tiltV] = spring(S.tilt, S.tiltV, S.tiltTo, 4);
     S.nextEar -= dt; if (S.nextEar < 0) { S.nextEar = 2 + Math.random() * 5; S.ear[Math.random() < .5 ? 0 : 1] = t; }
-    if (petted && t - it.petT < .05) S.swish = 1;
-    S.swish = Math.max(0, S.swish - dt * .5);
-    S.tailPhase += dt * (1.1 + S.swish * 2.5);
+    S.tailPhase += dt * (.9 + S.purr * .3);
     return S;
   }
   warpAt(it, S, X, Y, t) {
@@ -1465,7 +1500,9 @@ class SketchPage {
     // breathing: the ribcage rises and the belly fills
     const br = (Math.sin(t * 1.55) * .5 + .5);
     const torso = clamp(1 - Math.abs(X - 450) / 190, 0, 1) * clamp((1150 - Y) / 140, 0, 1);
-    y -= br * 2.2 * torso; y += br * 1.4 * torso * clamp((Y - 1060) / 60, 0, 1);
+    y -= br * 2.6 * torso; y += br * 1.6 * torso * clamp((Y - 1060) / 60, 0, 1);
+    // a purr is felt more than seen: a fine tremor through the body
+    if (S.purr > .02) { const v = Math.sin(t * 57) * .45 * S.purr * torso; x += v; y += v * .5; }
     // weight shifting from one side to the other
     x += Math.sin(t * .42) * 1.6 * feet;
     // head turns and tilts on the neck
@@ -1479,7 +1516,7 @@ class SketchPage {
     it.ears.forEach(([ex, ey], i) => {
       const age = t - S.ear[i]; if (age < 0 || age > .32) return;
       const w = 1 - smooth(6, 22, Math.hypot(X - ex, Y - ey)); if (w <= 0) return;
-      const a = Math.sin(age / .32 * Math.PI) * .5 * w * (i ? 1 : -1), c = Math.cos(a), s = Math.sin(a), bx = ex, by = ey + 16;
+      const a = Math.sin(age / .32 * Math.PI) * .5 * w * (i ? 1 : -1), c = Math.cos(a), s = Math.sin(a), bx = ex, by = ey + 16;  // flick
       const dx = x - bx, dy = y - by; x = bx + dx * c - dy * s; y = by + dx * s + dy * c;
     });
     // the tail swings from its root, more toward the tip, with a wave travelling down it
@@ -1487,7 +1524,7 @@ class SketchPage {
     if (X < tx + 6 && Y > ty - 40) {
       const sd = clamp((tx - X) / 140, 0, 1);
       if (sd > 0) {
-        const a = (Math.sin(S.tailPhase - sd * 2.2) * (.1 + S.swish * .22) + Math.sin(t * .37) * .05) * Math.pow(sd, 1.4);
+        const a = (Math.sin(S.tailPhase - sd * 2.2) * (.15 - S.purr * .06) + Math.sin(t * .37) * .06 + S.purr * .42) * Math.pow(sd, 1.25);
         const c = Math.cos(a), s = Math.sin(a), dx = x - tx, dy = y - ty;
         x = tx + dx * c - dy * s; y = ty + dx * s + dy * c;
       }
@@ -1519,6 +1556,28 @@ class SketchPage {
       for (let yy = a[1]; yy < Math.min(it.h, a[1] + G) && !any; yy += 4) for (let xx = a[0]; xx < Math.min(it.w, a[0] + G); xx += 4) if (it.alpha[yy * it.w + xx] > 8) { any = true; break; }
       if (!any) continue;
       tri(a, b, c); tri(b, d, c);
+    }
+    // eyelids: quick blinks, and the slow contented squeeze of a happy cat
+    const close = Math.max(Math.sin(Math.min(1, S.blink) * Math.PI) * .95, clamp(S.purr * 1.3, 0, 1));
+    if (close > .02 && it.eyes) for (const [ex, ey, rx, ry] of it.eyes) {
+      const [wx, wy] = this.warpAt(it, S, ex, ey, t);
+      x.save(); x.globalAlpha = close; x.fillStyle = 'rgb(251, 250, 247)';
+      x.beginPath(); x.ellipse(wx, wy, rx * 1.2, ry * 1.25, -.08, 0, Math.PI * 2); x.fill(); x.restore();
+      penPath(x, arcPts(wx, wy - ry * .3, rx * 1.05, ry * (.4 + .5 * close), Math.PI * .12, Math.PI * .88, 12), ex, .75, close, true);
+    }
+    // fur lifting along the back while it's stroked
+    if (S.purr > .03) {
+      const back = [[372, 1036], [398, 1022], [424, 1012], [450, 1006], [476, 1003], [502, 1002], [528, 1005]];
+      back.forEach(([bx, by], i) => {
+        const [wx, wy] = this.warpAt(it, S, bx, by, t), lift = S.purr * (.7 + .3 * Math.sin(t * 5 + i));
+        penPath(x, [[wx, wy - 1], [wx + 2 - i * .3, wy - 5 - 4 * lift], [wx + 5, wy - 7 - 5 * lift]], i * 3, .42, S.purr * .85, true);
+      });
+      // the purr itself: soft vibration marks beside the chest
+      for (let k = 0; k < 3; k++) {
+        const ph = (t * 1.6 + k / 3) % 1, a = Math.sin(ph * Math.PI) * S.purr * .7, r = 10 + ph * 16;
+        const [cx, cy] = this.warpAt(it, S, 640, 1068, t);
+        penPath(x, arcPts(cx + 6, cy, r * .6, r, -Math.PI * .35, Math.PI * .35, 10), k * 7, .5, a, true);
+      }
     }
   }
   drawGlow(x, it, k) {
@@ -1561,6 +1620,11 @@ class SketchPage {
           x.globalAlpha = f.op ?? 1; x.fillStyle = `rgb(${f.col})`; x.beginPath(); x.ellipse(f.x, f.y, f.r, f.r * .8, 0, 0, Math.PI * 2); x.fill();
           penPath(x, arcPts(f.x, f.y, f.r, f.r * .8, 0, Math.PI * 2, 26), 2, .8, f.op ?? 1, false); break;
         case 'slice': this.drawSlice(x, f); break;
+        case 'cutline': {    // the cut deepening as the knife saws
+          const p = f.it, u = clamp(f.age / f.life, 0, 1), len = 30 + 200 * u;
+          penPath(x, [[p.c[0] + Math.cos(f.a) * 4, p.c[1] + Math.sin(f.a) * 4], [p.c[0] + Math.cos(f.a) * len, p.c[1] + Math.sin(f.a) * len]], 3, .8, .7 * Math.min(1, u * 4), false);
+          break;
+        }
         case 'ring': {
           const u = f.age / 1.8, rx = 8 + u * 70 * f.s, a = (1 - u) * .9;
           penPath(x, arcPts(f.x, f.y, rx, rx * .28, Math.PI * 1.08, Math.PI * 1.92, 18), f.seed, .7, a, true);
@@ -1572,11 +1636,16 @@ class SketchPage {
         }
         case 'drop': penPath(x, [[f.x, f.y], [f.x - f.vx * .02, f.y - f.vy * .02]], f.seed, .7, 1 - f.age / .7, true); break;
         case 'spark': {
-          const u = f.age, a = 1 - u;
-          for (let i = 0; i < 4; i++) { const ang = i * Math.PI / 2 + .3, r0 = 22 + u * 18, r1 = r0 + 16 * (1 - u * .5); penPath(x, [[f.x + Math.cos(ang) * r0, f.y + Math.sin(ang) * r0], [f.x + Math.cos(ang) * r1, f.y + Math.sin(ang) * r1]], f.seed + i, .8, a, true); }
+          const u = f.age, a = (1 - u) * (f.small ? Math.sin(u * Math.PI) * 1.4 : 1), sc = f.small ? .45 : 1;
+          for (let i = 0; i < 4; i++) { const ang = i * Math.PI / 2 + .3, r0 = (22 + u * 18) * sc, r1 = r0 + 16 * (1 - u * .5) * sc; penPath(x, [[f.x + Math.cos(ang) * r0, f.y + Math.sin(ang) * r0], [f.x + Math.cos(ang) * r1, f.y + Math.sin(ang) * r1]], f.seed + i, .8, a, true); }
           break;
         }
-        case 'bubble': { const it = f.it, top = it.level[0] + (it.level[1] - it.level[0]) * it.drunk; if (f.y < top + 4) break; penPath(x, arcPts(f.x + Math.sin(f.age * 9 + f.seed) * 2, f.y, f.r, f.r, 0, Math.PI * 2, 10), f.seed, .45, 1 - f.age / 1.2, false); break; }
+        case 'bubble': { const it = f.it, top = it.level[0] + (it.level[1] - it.level[0]) * it.drunk; if (f.y < top + 4) break; penPath(x, arcPts(f.x + Math.sin(f.age * 9 + f.seed) * 2, f.y, f.r, f.r, 0, Math.PI * 2, 10), f.seed, f.slow ? .32 : .45, (1 - f.age / (f.life || 1.2)) * (f.slow ? .6 : 1), false); break; }
+        case 'steam': {      // a wisp of heat: a soft pencil squiggle that rises and thins
+          const u = f.age / f.life, a = Math.sin(u * Math.PI) * .35, pts = [];
+          for (let i = 0; i < 9; i++) pts.push([f.x + Math.sin(i * .9 + f.age * 2 + f.seed) * (4 + u * 6), f.y - i * 6]);
+          penPath(x, pts, f.seed, .45, a, true); break;
+        }
         case 'bird': {
           const sp = 19 * f.sc, fl = Math.sin(f.ph), up = 9 * f.sc, a = Math.min(1, f.age * 4) * (1 - smooth(6, 8, f.age));
           const tipY = f.y - fl * up, ctlY = f.y - up * (.55 + .45 * fl) - 3 * f.sc, dir = Math.sign(f.vx) || 1;
@@ -1686,7 +1755,7 @@ class Curl {
     [front, back].forEach((img, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.tex[i]); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); });
   }
   /* theta: 0 (lying flat where it started) .. PI (lying on the other side). dir: 1 right->left, -1 left->right */
-  draw(theta, dir, grabV, lay) {
+  draw(theta, dir, grabV, lay, peek = 0) {
     const gl = this.gl; if (!gl) return null;
     const dpr = Math.min(devicePixelRatio || 1, 2), r = this.c.getBoundingClientRect();
     const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
@@ -1703,6 +1772,8 @@ class Curl {
       for (let i = 0; i <= NU; i++) {
         const u = i / NU;
         a = theta - bend * Math.pow(u, 1.25) * lagK * .62;
+        // hovering: just the corner under the pointer lifts, curling up off the page
+        if (peek > 0) a += peek * 1.25 * Math.pow(clamp((u - .5) / .5, 0, 1), 1.7) * Math.exp(-Math.pow((v - grabV) / .3, 2));
         a = clamp(a, 0, Math.PI);
         if (i > 0) { x += Math.cos(a) * pw / NU; z += Math.sin(a) * pw / NU; }
         const X = dir * x, Y = (v - .5) * ph, k = f / (f - z);
@@ -1828,9 +1899,40 @@ const Book = {
     if (this.flip && !this.flip.pending) v.push(...S(this.flip.to));
     return v.filter((p) => p && p.obj);
   },
+  peekState: null,
+  async peek(dir, v) {
+    const to = this.cur + dir;
+    if (this.flip || to < 0 || to >= SPREADS.length || matchMedia('(max-width: 760px)').matches) return;
+    const P = this.peekState;
+    if (P && P.dir === dir) { P.v = v; P.to = 1; return; }
+    if (P) this.endPeek();
+    const st = this.peekState = { dir, v, amt: 0, to: 1, ready: false };
+    await ensureSpread(to);
+    if (this.peekState !== st || this.flip) return;
+    const a = SPREADS[this.cur], b = SPREADS[to], t = (performance.now() - App.t0) / 1000;
+    const turning = dir > 0 ? Pages[a.R] : Pages[a.L], under = dir > 0 ? Pages[b.R] : Pages[b.L];
+    for (const p of [turning, under]) { p.obj.resize(); p.frame(t, .0001); }
+    Curl1.setTextures(snapshot(turning, dir > 0 ? 'right' : 'left'), snapshot(dir > 0 ? Pages[b.L] : Pages[b.R], dir > 0 ? 'left' : 'right'));
+    st.slot = $('slot' + (dir > 0 ? 'R' : 'L')); st.orig = turning.sheet; st.slot.replaceChildren(under.sheet);
+    st.ready = true;
+  },
+  unpeek() { if (this.peekState) this.peekState.to = 0; },
+  endPeek() {
+    const P = this.peekState; if (!P) return;
+    if (P.ready && !this.flip) { P.slot.replaceChildren(P.orig); Curl1.clear(); }
+    $('cast').style.opacity = 0; this.peekState = null;
+  },
+  stepPeek(dt) {
+    const P = this.peekState; if (!P || this.flip) return;
+    P.amt += (P.to - P.amt) * (1 - Math.exp(-dt * (P.to ? 9 : 7)));
+    if (!P.ready) return;
+    if (P.to === 0 && P.amt < .01) return this.endPeek();
+    Curl1.draw(0, P.dir, P.v, this.layout(), P.amt * (.55 + .25 * Math.abs(P.v - .5) * 2));
+  },
   async go(dir, drag) {
     const to = this.cur + dir;
     if (this.flip || to < 0 || to >= SPREADS.length) return false;
+    if (this.peekState) { const P = this.peekState; if (P.ready) P.slot.replaceChildren(P.orig); this.peekState = null; }
     this.flip = { pending: true, to, dir };
     await ensureSpread(to);
     const a = SPREADS[this.cur], b = SPREADS[to];
@@ -1952,8 +2054,13 @@ async function start() {
   // drag a page by its outer edge
   for (const [id, dir] of [['cornerR', 1], ['cornerL', -1]]) {
     const el = $(id); let lastX = 0, lastT = 0, vx = 0;
+    let downX = 0;
+    const vOf = (e) => { const br = $('book').getBoundingClientRect(); return clamp((e.clientY - br.top) / br.height, 0, 1); };
+    el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') Book.peek(dir, vOf(e)); });
+    el.addEventListener('pointermove', (e) => { if (!e.buttons && e.pointerType === 'mouse') Book.peek(dir, vOf(e)); });
+    el.addEventListener('pointerleave', () => Book.unpeek());
     el.addEventListener('pointerdown', async (e) => {
-      el.setPointerCapture(e.pointerId); lastX = e.clientX; lastT = performance.now(); vx = 0;
+      el.setPointerCapture(e.pointerId); lastX = e.clientX; lastT = performance.now(); vx = 0; downX = e.clientX;
       const br = $('book').getBoundingClientRect();
       const ok = await Book.go(dir, { v: clamp((e.clientY - br.top) / br.height, 0, 1) });
       if (!ok) return;
@@ -1965,7 +2072,11 @@ async function start() {
         const now = performance.now(); vx = (ev.clientX - lastX) / Math.max(1, now - lastT); lastX = ev.clientX; lastT = now;
       };
     });
-    const up = () => { el.onpointermove = null; Book.release(vx); };
+    const up = (e) => {
+      el.onpointermove = null;
+      if (e && Math.abs(e.clientX - downX) < 8) vx = -dir;      // a tap: let the page go all the way over
+      Book.release(vx);
+    };
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   }
 
@@ -1995,7 +2106,7 @@ async function start() {
       }
     }
     document.documentElement.style.setProperty('--dusk', sunVisible && !Book.flip ? (smooth(.45, 1, App.s) * .9).toFixed(3) : '0');
-    Book.step(dt);
+    Book.step(dt); Book.stepPeek(dt);
     for (const p of vis) p.frame(t, dt);
     requestAnimationFrame(loop);
   };

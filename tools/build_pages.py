@@ -80,7 +80,9 @@ for pid, items in PAGES.items():
         region = poly_mask(it['poly']) if 'poly' in it else np.zeros((H, W), np.uint8)
         if 'box' in it:
             x0, y0, x1, y1 = it['box']; region[max(y0, 0):y1, max(x0, 0):x1] = 1
-        if 'exclude' in it: region &= 1 - poly_mask(it['exclude'])
+        if 'exclude' in it:
+            ex = it['exclude'] if isinstance(it['exclude'][0][0], (list, tuple)) else [it['exclude']]
+            for e in ex: region &= 1 - poly_mask(e)
         if it.get('zone'):
             out.append({k: v for k, v in it.items() if k not in ('poly',)}); continue
         mode = it.get('mask', 'ink'); text = it.get('b') == 'text'
@@ -91,7 +93,7 @@ for pid, items in PAGES.items():
             m = (c | (ink & cv2.dilate(c, np.ones((11, 11))) & region)).astype(np.uint8)
             m = binary_fill_holes(cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9)))).astype(np.uint8)
         else:
-            m = (ink | colored) & region
+            m = (((dark > it['inkmin']).astype(np.uint8) if 'inkmin' in it else ink) | colored) & region
             m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9) if text or it.get('nofill') else (21, 21)))
             if not text and not it.get('nofill'):
                 m = binary_fill_holes(m).astype(np.uint8)
@@ -112,6 +114,15 @@ for pid, items in PAGES.items():
         if 'fill' in it: clones.append((it['fill'], soft.copy()))
         if it.get('remove'): continue
         img = P.copy(); alpha = soft.copy()
+        if 'under_rot' in it:        # continue the food under what lies on it: the same food, turned about its centre
+            cx, cy, deg, pts = it['under_rot']
+            K = cv2.dilate(poly_mask(pts), np.ones((9, 9))).astype(np.float32)
+            M = cv2.getRotationMatrix2D((cx, cy), -deg, 1.0)
+            rot = cv2.warpAffine(P, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+            ra = cv2.warpAffine(alpha, M, (W, H))
+            f = cv2.GaussianBlur(K, (0, 0), 3)[..., None]
+            img = img * (1 - f) + rot * f
+            alpha = np.maximum(alpha, cv2.GaussianBlur(K, (0, 0), 2) * np.clip(ra * 1.2, 0, 1))
         if 'under_of' in it:        # what was hidden under something lying on top (the knife): continue the food beneath
             K = cv2.dilate(poly_mask(it['under_of']), np.ones((7, 7)))
             u8 = (img * 255).astype(np.uint8)
@@ -137,7 +148,7 @@ for pid, items in PAGES.items():
         x0, y0 = max(xs.min() - 2, 0), max(ys.min() - 2, 0)
         x1, y1 = min(xs.max() + 3, W), min(ys.max() + 3, H)
         save(f'{OUT}/{pid}/{it["id"]}.webp', img[y0:y1, x0:x1], alpha[y0:y1, x0:x1])
-        rec = {k: v for k, v in it.items() if k not in ('box', 'poly', 'mask', 'fill', 'extra', 'exclude', 'under', 'under_of')}
+        rec = {k: v for k, v in it.items() if k not in ('box', 'poly', 'mask', 'fill', 'extra', 'exclude', 'under', 'under_of', 'under_rot')}
         if it.get('pieces'):
             c = (colored & (dark < 0.55) & m).astype(np.uint8)
             c = cv2.morphologyEx(c, cv2.MORPH_OPEN, np.ones((3, 3)))

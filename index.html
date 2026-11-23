@@ -178,8 +178,8 @@ footer { display: grid; gap: 10px; justify-items: center; max-width: 560px; widt
 .cast { position: absolute; top: 0; bottom: 0; pointer-events: none; z-index: 3; opacity: 0; width: var(--spread, 60px); }
 .cast.on-right { left: var(--edge, 50%); background: linear-gradient(90deg, rgba(30, 24, 20, .34), rgba(30, 24, 20, .1) 40%, transparent); }
 .cast.on-left { right: var(--edge, 50%); background: linear-gradient(270deg, rgba(30, 24, 20, .34), rgba(30, 24, 20, .1) 40%, transparent); }
-.corner { position: absolute; top: 0; bottom: 0; width: 26px; z-index: 5; cursor: grab; touch-action: none; }
-.corner.right { right: -8px; } .corner.left { left: -8px; }
+.corner { position: absolute; top: 0; bottom: 0; width: 46px; z-index: 5; cursor: pointer; touch-action: none; }
+.corner.right { right: -10px; } .corner.left { left: -10px; }
 .corner::before { content: ""; position: absolute; top: 0; bottom: 0; width: 18px; opacity: 0; transition: opacity .25s; }
 .corner.right::before { right: 8px; background: linear-gradient(270deg, rgba(40, 32, 26, .16), transparent); }
 .corner.left::before { left: 8px; background: linear-gradient(90deg, rgba(40, 32, 26, .16), transparent); }
