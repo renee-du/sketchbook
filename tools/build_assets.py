@@ -95,7 +95,7 @@ items = {   # x0,y0,x1,y1 boxes (page px)
   'melon':   (70, 300, 318, 545),
   'cherry':  (272, 255, 405, 412),
   'popsicle':(470, 374, 790, 632),
-  'eclair':  (190, 585, 650, 775),
+  'eclair':  (190, 585, 650, 797),
   'lbl_melon':   (95, 160, 505, 232),
   'lbl_bracket': (70, 245, 120, 390),
   'lbl_cherry':  (392, 240, 605, 352),
@@ -119,7 +119,7 @@ for name, (x0, y0, x1, y1) in items.items():
     if name == 'melon': m[:405, :106] = 0; m[:388, 256:] = 0
     if name == 'popsicle': m[:412, 696:] = 0
     if name == 'lbl_pop': m[378:, :696] = 0
-    if name == 'eclair': m[:628, 505:] = 0
+    if name == 'eclair': m[:628, 505:] = 0; m[776:, 340:] = 0
     if not name.startswith('lbl'): k = 21
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((k, k)))
     if not name.startswith('lbl'):   # fill interior holes

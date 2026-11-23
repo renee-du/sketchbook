@@ -15,7 +15,7 @@
   --line: rgba(41, 40, 45, .12);
   --chip: rgba(255, 255, 255, .62);
   --accent: #d9862c;           /* sunset amber, used only on the time control */
-  --cover: #2e3846;            /* slate linen, borrowed from the sea */
+  --cover: #a5845d;            /* tan bookcloth */
   --paper: #fbf9f5;
   --edge-a: #e4e0d8;
   --edge-b: #f6f3ee;
@@ -28,13 +28,13 @@
   :root:not([data-theme="light"]) {
     --desk: #18191d; --desk-2: #101114; --text: #ebe7e1; --muted: #9b97a1;
     --line: rgba(235, 231, 225, .12); --chip: rgba(255, 255, 255, .06); --accent: #f0a04b;
-    --cover: #3a4555; color-scheme: dark;
+    --cover: #8d6e4c; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --desk: #18191d; --desk-2: #101114; --text: #ebe7e1; --muted: #9b97a1;
   --line: rgba(235, 231, 225, .12); --chip: rgba(255, 255, 255, .06); --accent: #f0a04b;
-  --cover: #3a4555; color-scheme: dark;
+  --cover: #8d6e4c; color-scheme: dark;
 }
 
 [hidden] { display: none !important; }
@@ -186,9 +186,9 @@ footer { display: grid; gap: 10px; justify-items: center; max-width: 560px; widt
 .corner:hover::before { opacity: 1; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; }
 .pager .icon-btn:disabled { opacity: .3; cursor: default; transform: none; }
-.where { display: grid; justify-items: center; gap: 4px; min-width: 14ch; }
+.where { display: grid; justify-items: center; min-width: 8ch; }
 .where .place { font: italic 400 19px/1.1 var(--f-display); text-align: center; text-wrap: balance; }
-.where .count { font: 500 10.5px/1 var(--f-mono); letter-spacing: .08em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.where .count { font: 500 12px/1 var(--f-mono); letter-spacing: .08em; color: var(--muted); font-variant-numeric: tabular-nums; }
 header { justify-content: flex-end; }
 
 /* ---------- phones: slide between the two pages */
@@ -216,10 +216,6 @@ header { justify-content: flex-end; }
         <svg class="on" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="3.6" height="14" rx="1"/><rect x="13.9" y="5" width="3.6" height="14" rx="1"/></svg>
         <svg class="off" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.8l10-6.8c.6-.4.6-1.2 0-1.6l-10-6.8C8.9 3.9 8 4.4 8 5.2z"/></svg>
       </button>
-      <button class="icon-btn" id="sound" aria-pressed="false" aria-label="Turn sound on" title="Sound">
-        <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18.2 6.5a8 8 0 0 1 0 11"/></svg>
-        <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
-      </button>
     </div>
   </header>
 
@@ -246,10 +242,9 @@ header { justify-content: flex-end; }
     </div>
     <nav class="pager" aria-label="Pages">
       <button class="icon-btn" id="prev" aria-label="Previous pages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6l-6 6 6 6"/></svg></button>
-      <div class="where"><span class="place" id="place">Rome, Italy</span><span class="count" id="count">1 / 7</span></div>
+      <div class="where"><span class="count" id="count">1 / 5</span></div>
       <button class="icon-btn" id="next" aria-label="Next pages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 6l6 6-6 6"/></svg></button>
     </nav>
-    <ul class="hints" id="hints"></ul>
   </footer>
 </div>
 

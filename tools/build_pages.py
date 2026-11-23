@@ -5,7 +5,7 @@ writes assets/<page>/base.webp, assets/<page>/<item>.webp (+ <item>_pieces.png) 
 """
 import cv2, numpy as np, sys, os, json
 sys.path.insert(0, os.path.dirname(__file__))
-from pages_config import PAGES, SOURCE
+from pages_config import PAGES, SOURCE, SPREAD_SRC
 from scipy.ndimage import binary_fill_holes, distance_transform_edt
 SRC, OUT = sys.argv[1], sys.argv[2]
 W, H = 900, 1300
@@ -51,8 +51,11 @@ def pen_strokes(img, alpha, lines, seed=1):
 
 meta = {}
 for pid, items in PAGES.items():
-    src = f"{SRC}/{SOURCE[pid[:2]]}_{pid[-1]}.png"
-    P = clean_levels(cv2.imread(src).astype(np.float32) / 255)
+    if pid in SPREAD_SRC:            # a whole spread laid out as one 1800px-wide room
+        P = np.hstack([clean_levels(cv2.imread(f"{SRC}/{n}.png").astype(np.float32) / 255) for n in SPREAD_SRC[pid]])
+    else:
+        P = clean_levels(cv2.imread(f"{SRC}/{SOURCE[pid[:2]]}_{pid[-1]}.png").astype(np.float32) / 255)
+    W = P.shape[1]
     edge = np.ones((H, 1), np.float32); edge[:10] = 0; edge[-20:] = 0
     P = 1 - (1 - P) * cv2.GaussianBlur(edge, (1, 9), 0)[..., None]
     os.makedirs(f'{OUT}/{pid}', exist_ok=True)
@@ -89,12 +92,17 @@ for pid, items in PAGES.items():
             m = binary_fill_holes(cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9)))).astype(np.uint8)
         else:
             m = (ink | colored) & region
-            m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9) if text else (21, 21)))
-            if not text:
+            m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9) if text or it.get('nofill') else (21, 21)))
+            if not text and not it.get('nofill'):
                 m = binary_fill_holes(m).astype(np.uint8)
                 n, lab, st, _ = cv2.connectedComponentsWithStats(m)
                 m = np.isin(lab, [i for i in range(1, n) if st[i, 4] > 120]).astype(np.uint8)
         m &= region
+        if it.get('noblue'):          # leave the pale blue pencil shadow on the page
+            bl = (P[..., 0] > P[..., 2] + 0.03) & (dark < 0.35)
+            m &= (1 - cv2.dilate(bl.astype(np.uint8), np.ones((3, 3))))
+            n_, lab_, st_, _ = cv2.connectedComponentsWithStats(m)
+            m = np.isin(lab_, [i for i in range(1, n_) if st_[i, 4] > 400]).astype(np.uint8)
         m &= (1 - cv2.dilate(claimed, np.ones((3, 3))))
         if mode != 'box': m = cv2.dilate(m, np.ones((5, 5))) & region
         soft = cv2.GaussianBlur(m.astype(np.float32), (13, 13) if mode == 'box' else (7, 7), 0)
@@ -104,6 +112,11 @@ for pid, items in PAGES.items():
         if 'fill' in it: clones.append((it['fill'], soft.copy()))
         if it.get('remove'): continue
         img = P.copy(); alpha = soft.copy()
+        if 'under_of' in it:        # what was hidden under something lying on top (the knife): continue the food beneath
+            K = cv2.dilate(poly_mask(it['under_of']), np.ones((7, 7)))
+            u8 = (img * 255).astype(np.uint8)
+            img = cv2.inpaint(u8, K, 11, cv2.INPAINT_TELEA).astype(np.float32) / 255
+            alpha = np.maximum(alpha, cv2.GaussianBlur(K.astype(np.float32), (5, 5), 0))
         if 'extra' in it:
             before = alpha > 0.5
             pen_strokes(img, alpha, it['extra'])
@@ -124,7 +137,7 @@ for pid, items in PAGES.items():
         x0, y0 = max(xs.min() - 2, 0), max(ys.min() - 2, 0)
         x1, y1 = min(xs.max() + 3, W), min(ys.max() + 3, H)
         save(f'{OUT}/{pid}/{it["id"]}.webp', img[y0:y1, x0:x1], alpha[y0:y1, x0:x1])
-        rec = {k: v for k, v in it.items() if k not in ('box', 'poly', 'mask', 'fill', 'extra', 'exclude', 'under')}
+        rec = {k: v for k, v in it.items() if k not in ('box', 'poly', 'mask', 'fill', 'extra', 'exclude', 'under', 'under_of')}
         if it.get('pieces'):
             c = (colored & (dark < 0.55) & m).astype(np.uint8)
             c = cv2.morphologyEx(c, cv2.MORPH_OPEN, np.ones((3, 3)))
@@ -174,7 +187,12 @@ for pid, items in PAGES.items():
         base = base * (1 - h) + np.roll(P, (-dy, -dx), axis=(0, 1)) * h
     for M, u in unders:
         base = base * (1 - M[..., None]) + u * M[..., None]
-    save(f'{OUT}/{pid}/base.webp', base, q=88)
+    if pid in SPREAD_SRC:
+        for i, side in enumerate('LR'):
+            os.makedirs(f'{OUT}/{pid}_{side}', exist_ok=True)
+            save(f'{OUT}/{pid}_{side}/base.webp', base[:, i * 900:(i + 1) * 900], q=88)
+    else:
+        save(f'{OUT}/{pid}/base.webp', base, q=88)
     meta[pid] = out
     print(pid, len(out), 'items')
 json.dump(meta, open(f'{OUT}/pages.json', 'w'), separators=(',', ':'))

@@ -1,7 +1,6 @@
 # Taccuino di Viaggio
 
-An interactive travel sketchbook: seven spreads (Rome, Seillans and Fayence, Spain, Tianzifang,
-furniture studies, clothes) built from photos of the real pages. Turn pages with the arrows, the
+An interactive travel sketchbook: five spreads (Rome twice, Spain, Tianzifang, furniture studies) built from photos of the real pages. Turn pages with the arrows, the
 arrow keys, or by dragging a page's outer edge. Every drawing is cut from the scan, never redrawn.
 Open `index.html` through any static server (`python3 -m http.server`).
 
@@ -37,8 +36,12 @@ The engine is `SketchPage` in `app.js`.
 ### This round
 
 - `src/` holds the engine pieces that are concatenated into `app.js`: `engine.js` (pencil colouring,
-  hatching, sounds), `cat.js` (the redrawn Seillans cat: a skeleton with IK legs, a walk cycle,
-  breathing, blinks, ear flicks, sitting and a sprung tail), `page.js` (pages: dragging, colouring
+  hatching, sounds), `page.js` (pages: dragging, colouring
   sweeps, pieces, cheese pulls), `curl.js` (the WebGL page turn).
 - Colouring in uses the artist's own yellow hatching from the sunset page as the stroke texture,
   revealed band by band in the order a hand lays strokes.
+
+- The furniture spread is built as one 1800px room (`'fu'` in `tools/pages_config.py`), so pieces can be
+  dragged from one page onto the other.
+- The Tianzifang cat is the artist's own drawing bent on a fine mesh (breathing, weight shifts, head
+  turns, ear flicks, tail swish); see `warpAt` in `src/page.js`.

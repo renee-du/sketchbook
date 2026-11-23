@@ -62,6 +62,7 @@ function penPath(x, path, seed, scale, alpha, taper = true) {
   x.closePath(); x.fillStyle = `rgba(${PEN}, ${.88 * alpha})`; x.fill();
   x.lineWidth = 1.1; x.strokeStyle = `rgba(${PEN}, ${.16 * alpha})`; x.stroke();
 }
+const lerp2 = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
 const arcPts = (cx, cy, rx, ry, a0, a1, n = 24) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]; });
 const ease = (t) => (t = clamp(t, 0, 1), t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const easeOut = (t) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
